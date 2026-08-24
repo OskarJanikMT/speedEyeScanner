@@ -72,6 +72,7 @@ class ViewTab(QWidget):
         self.ai_enabled = True
         self.ai_warmup_started_at = None
         self._last_cut_plan_payload = None
+        self._latest_machine_cut_payload = None
         self._analysis_results_by_board = {}
         self._preview_results_by_board = {}
         self._last_stitch_ms = 0.0
@@ -760,6 +761,15 @@ class ViewTab(QWidget):
     def handle_analysis_finished(self, result):
         board_id = str(result.get("board_id", "")).strip()
         final_boxes = list(result.get("boxes", []))
+        machine_cut_payload = self._build_machine_cut_payload(result)
+        self._latest_machine_cut_payload = machine_cut_payload
+        if machine_cut_payload is not None:
+            self.add_log(
+                "Plan ciecia dla maszyny gotowy: "
+                f"{machine_cut_payload['board_id']} "
+                f"ciecia={len(machine_cut_payload['cut_positions_mm'])} "
+                f"strefy_zle={len(machine_cut_payload['bad_segments_mm'])}"
+            )
         if board_id:
             self._analysis_results_by_board[board_id] = dict(result)
             preview_result = self._preview_results_by_board.get(board_id)
@@ -1275,6 +1285,56 @@ class ViewTab(QWidget):
             filtered_boxes.append(box)
 
         return filtered_boxes
+
+    def _build_machine_cut_payload(self, result):
+        board_id = str(result.get("board_id", "")).strip()
+        board_length_mm = float(result.get("length_mm", 0) or 0)
+        image_height_px = int(result.get("image_height_px", 0) or 0)
+        boxes = list(result.get("boxes", []) or [])
+        if not board_id or board_length_mm <= 0 or image_height_px <= 0:
+            return None
+
+        margin_mm = self.settings_store.get_int("cut_bad_zone_offset_mm", 120)
+        bad_segments_mm = self._build_bad_segments_mm(
+            boxes=boxes,
+            board_length_mm=board_length_mm,
+            image_height_px=image_height_px,
+            offset_mm=margin_mm,
+        )
+        good_segments_mm = self._build_good_segments_mm(board_length_mm, bad_segments_mm)
+        cut_positions_mm = [segment[0] for segment in good_segments_mm if segment[0] > 0.0]
+
+        return {
+            "board_id": board_id,
+            "source": "ai_stream",
+            "board_length_mm": board_length_mm,
+            "margin_mm": int(margin_mm),
+            "bad_segments_mm": bad_segments_mm,
+            "good_segments_mm": good_segments_mm,
+            "cut_positions_mm": cut_positions_mm,
+            "defect_count": len(boxes),
+            "inference_ms": float(result.get("inference_ms", 0.0) or 0.0),
+        }
+
+    def _build_good_segments_mm(self, board_length_mm, bad_segments_mm):
+        if board_length_mm <= 0:
+            return []
+        if not bad_segments_mm:
+            return [(0.0, float(board_length_mm))]
+
+        good_segments = []
+        cursor_mm = 0.0
+        for start_mm, end_mm in bad_segments_mm:
+            start_mm = max(0.0, min(float(board_length_mm), float(start_mm)))
+            end_mm = max(start_mm, min(float(board_length_mm), float(end_mm)))
+            if start_mm > cursor_mm:
+                good_segments.append((cursor_mm, start_mm))
+            cursor_mm = max(cursor_mm, end_mm)
+
+        if cursor_mm < float(board_length_mm):
+            good_segments.append((cursor_mm, float(board_length_mm)))
+
+        return good_segments
 
     def _find_latest_board_directory(self):
         base_directory = self.get_camera_output_directory()

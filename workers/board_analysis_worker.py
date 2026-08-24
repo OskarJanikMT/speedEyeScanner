@@ -122,6 +122,7 @@ class BoardAnalysisWorker(QObject):
                         "defect_count": 0,
                         "boxes": [],
                         "inference_ms": 0.0,
+                        "machine_ready_latency_ms": 0.0,
                         "image_height_px": 0,
                         "ai_available": False,
                         "ai_error": "",
@@ -133,6 +134,7 @@ class BoardAnalysisWorker(QObject):
             if self._current_board is None or self._current_board["board_id"] != event["board_id"]:
                 return
             self._drain_ready_tiles(flush=True)
+            ready_started_at = perf_counter()
             self._current_board["boxes"] = self._aggregate_stream_boxes(self._current_board["boxes"])
             result = {
                 "board_id": self._current_board["board_id"],
@@ -141,6 +143,7 @@ class BoardAnalysisWorker(QObject):
                 "defect_count": len(self._current_board["boxes"]),
                 "boxes": self._current_board["boxes"],
                 "inference_ms": self._current_board["inference_ms"],
+                "machine_ready_latency_ms": 0.0,
                 "image_height_px": self._current_board["image_height_px"],
                 "image_width_px": self._current_board["image_width_px"],
                 "stream_crop_left_px": self._current_board["stream_crop_left_px"],
@@ -149,6 +152,12 @@ class BoardAnalysisWorker(QObject):
                 "ai_error": "",
                 "detections_path": "",
             }
+            last_model_output_at = float(self._current_board.get("last_model_output_at", 0.0) or 0.0)
+            if last_model_output_at > 0.0:
+                result["machine_ready_latency_ms"] = max(
+                    0.0,
+                    (ready_started_at - last_model_output_at) * 1000.0,
+                )
             self.finished.emit(result)
             self._reset_board_session()
         except Exception as exc:
@@ -173,6 +182,7 @@ class BoardAnalysisWorker(QObject):
                 "tile_index": 0,
                 "boxes": [],
                 "inference_ms": 0.0,
+                "last_model_output_at": 0.0,
                 "stream_crop_left_px": None,
                 "stream_crop_right_px": None,
             }
@@ -244,6 +254,7 @@ class BoardAnalysisWorker(QObject):
             raise RuntimeError(response.get("error") or "Helper AI zwrocil blad")
 
         result = response["result"]
+        self._current_board["last_model_output_at"] = perf_counter()
         global_y_offset = self._current_board["image_height_px"]
         for box in result.get("boxes", []):
             self._current_board["boxes"].append(

@@ -186,6 +186,7 @@ class ViewTab(QWidget):
         self.defect_count = QLabel("0")
         self.scan_time = QLabel("--- ms")
         self.ai_time = QLabel("--- ms")
+        self.machine_ready_time = QLabel("--- ms")
         self.scan_status = QLabel("OCZEKIWANIE")
 
         info_grid.addWidget(QLabel("ID deski:"), 0, 0)
@@ -196,8 +197,10 @@ class ViewTab(QWidget):
         info_grid.addWidget(self.scan_time, 2, 1)
         info_grid.addWidget(QLabel("Czas AI:"), 3, 0)
         info_grid.addWidget(self.ai_time, 3, 1)
-        info_grid.addWidget(QLabel("Status:"), 4, 0)
-        info_grid.addWidget(self.scan_status, 4, 1)
+        info_grid.addWidget(QLabel("Model -> maszyna:"), 4, 0)
+        info_grid.addWidget(self.machine_ready_time, 4, 1)
+        info_grid.addWidget(QLabel("Status:"), 5, 0)
+        info_grid.addWidget(self.scan_status, 5, 1)
 
         scan_layout.addLayout(info_grid)
         scan_layout.addStretch()
@@ -763,12 +766,16 @@ class ViewTab(QWidget):
         final_boxes = list(result.get("boxes", []))
         machine_cut_payload = self._build_machine_cut_payload(result)
         self._latest_machine_cut_payload = machine_cut_payload
+        machine_ready_latency_ms = float(result.get("machine_ready_latency_ms", 0.0) or 0.0)
+        self.machine_ready_time.setText(f"{machine_ready_latency_ms:.0f} ms")
         if machine_cut_payload is not None:
             self.add_log(
                 "Plan ciecia dla maszyny gotowy: "
                 f"{machine_cut_payload['board_id']} "
                 f"ciecia={len(machine_cut_payload['cut_positions_mm'])} "
-                f"strefy_zle={len(machine_cut_payload['bad_segments_mm'])}"
+                f"latencja={machine_ready_latency_ms:.0f} ms "
+                f"strefy_zle={len(machine_cut_payload['bad_segments_mm'])} "
+                f"wektor={machine_cut_payload['machine_segments_payload']}"
             )
         if board_id:
             self._analysis_results_by_board[board_id] = dict(result)
@@ -1312,6 +1319,11 @@ class ViewTab(QWidget):
             "bad_segments_mm": bad_segments_mm,
             "good_segments_mm": good_segments_mm,
             "cut_positions_mm": cut_positions_mm,
+            "machine_segments_payload": self._build_machine_segments_payload(
+                board_length_mm,
+                good_segments_mm,
+                bad_segments_mm,
+            ),
             "defect_count": len(boxes),
             "inference_ms": float(result.get("inference_ms", 0.0) or 0.0),
         }
@@ -1335,6 +1347,28 @@ class ViewTab(QWidget):
             good_segments.append((cursor_mm, float(board_length_mm)))
 
         return good_segments
+
+    def _build_machine_segments_payload(self, board_length_mm, good_segments_mm, bad_segments_mm):
+        total_length_mm = max(0, int(round(float(board_length_mm))))
+        segments = []
+
+        for start_mm, end_mm in good_segments_mm or []:
+            length_mm = max(0, int(round(float(end_mm) - float(start_mm))))
+            if length_mm > 0:
+                segments.append((float(start_mm), 1, length_mm))
+
+        for start_mm, end_mm in bad_segments_mm or []:
+            length_mm = max(0, int(round(float(end_mm) - float(start_mm))))
+            if length_mm > 0:
+                segments.append((float(start_mm), 3, length_mm))
+
+        segments.sort(key=lambda item: item[0])
+
+        payload = [total_length_mm]
+        for _, segment_class, length_mm in segments:
+            payload.append(int(segment_class))
+            payload.append(int(length_mm))
+        return payload
 
     def _find_latest_board_directory(self):
         base_directory = self.get_camera_output_directory()

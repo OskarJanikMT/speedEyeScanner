@@ -95,26 +95,41 @@ class CutPlanBar(QWidget):
         metrics = QFontMetrics(painter.font())
         base_label_top = bar_rect.bottom() + 26
         max_labels = 6
-        previous_right_by_row = [bar_rect.left() - 1, bar_rect.left() - 1]
+        row_count = 3
+        row_right_edges = [bar_rect.left() - 1 for _ in range(row_count)]
 
         for index, (start_mm, end_mm) in enumerate(self._bad_segments_mm[:max_labels]):
             label = f"{int(round(start_mm))}-{int(round(end_mm))}"
             label_width = metrics.horizontalAdvance(label) + 10
-            center_x = self._mm_to_x((start_mm + end_mm) * 0.5, bar_rect)
-            preferred_left = center_x - label_width / 2.0
-            row_index = index % 2
-            label_top = base_label_top + row_index * 16
-            left = max(
+            segment_left = self._mm_to_x(end_mm, bar_rect)
+            segment_right = self._mm_to_x(start_mm, bar_rect)
+            anchor_x = (segment_left + segment_right) / 2.0
+            preferred_left = max(
                 bar_rect.left(),
-                min(bar_rect.right() - label_width, preferred_left),
+                min(bar_rect.right() - label_width, anchor_x - label_width / 2.0),
             )
-            left = max(left, previous_right_by_row[row_index] + 6)
-            if left + label_width > bar_rect.right():
-                left = max(bar_rect.left(), bar_rect.right() - label_width)
-            previous_right_by_row[row_index] = left + label_width
+
+            best_row_index = 0
+            best_left = preferred_left
+            best_cost = None
+            for row_index in range(row_count):
+                candidate_left = max(preferred_left, row_right_edges[row_index] + 8)
+                candidate_left = min(candidate_left, bar_rect.right() - label_width)
+                if candidate_left < bar_rect.left():
+                    candidate_left = bar_rect.left()
+                overlap_penalty = max(0.0, (row_right_edges[row_index] + 8) - preferred_left)
+                distance_penalty = abs(candidate_left - preferred_left)
+                row_penalty = row_index * 12.0
+                cost = overlap_penalty * 3.0 + distance_penalty + row_penalty
+                if best_cost is None or cost < best_cost:
+                    best_cost = cost
+                    best_row_index = row_index
+                    best_left = candidate_left
+
+            row_right_edges[best_row_index] = best_left + label_width
             label_rect = QRectF(
-                left,
-                label_top,
+                best_left,
+                base_label_top + best_row_index * 16,
                 label_width,
                 14,
             )

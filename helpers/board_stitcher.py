@@ -1,26 +1,101 @@
 from pathlib import Path
-
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtGui import QColor, QImage, QPainter, QTransform
+
+
+DERIVED_OUTPUT_NAMES = {
+    "stitched.bmp",
+    "stitched_annotated.bmp",
+    "stitched_knots.json",
+    "ai_warmup.bmp",
+    "ai_warmup_out.bmp",
+}
+DEFAULT_LEFT_EDGE_ANCHOR_PX = 100
+LEFT_EDGE_SEARCH_RADIUS_PX = 80
+
+
+def rotate_qimage_180(image):
+    if image is None or image.isNull():
+        return image
+    return image.transformed(QTransform().rotate(180), Qt.FastTransformation)
+
+
+def load_ai_ready_image(
+    image_path,
+    crop_x_margin_percent=4,
+    active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+):
+    image = QImage(str(image_path)).convertToFormat(QImage.Format.Format_RGB32)
+    if image.isNull():
+        return None, None
+    image = rotate_qimage_180(image)
+
+    return crop_ai_ready_qimage(
+        image,
+        crop_x_margin_percent=crop_x_margin_percent,
+        active_threshold_percent=active_threshold_percent,
+        left_edge_anchor_px=left_edge_anchor_px,
+    )
+
+
+def crop_ai_ready_qimage(
+    image,
+    crop_x_margin_percent=4,
+    active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+):
+    if image is None or image.isNull():
+        return None, None
+
+    left, right = _estimate_final_horizontal_bounds(
+        image,
+        crop_x_margin_percent=crop_x_margin_percent,
+        final_crop_x_margin_percent=0,
+        active_threshold_percent=active_threshold_percent,
+        left_edge_anchor_px=left_edge_anchor_px,
+    )
+    cropped = image.copy(left, 0, max(1, right - left), image.height())
+    return cropped, (left, right)
+
 
 def stitch_board_folder(
     folder_path,
+    ordered_filenames=None,
     overlap_extra_pixels=48,
     max_horizontal_shift_px=36,
     crop_x_margin_percent=4,
     crop_y_margin_percent=2,
     final_crop_x_margin_percent=3,
     active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+    stitch_mode="ai_ready",
     on_log=None,
+    return_metadata=False,
 ):
     folder = Path(folder_path)
-    image_paths = sorted(folder.glob("*.bmp"), reverse=True)
+    if ordered_filenames:
+        image_paths = []
+        for filename in ordered_filenames:
+            candidate_path = folder / str(filename)
+            if candidate_path.exists() and candidate_path.name.lower() not in DERIVED_OUTPUT_NAMES:
+                image_paths.append(candidate_path)
+    else:
+        image_paths = sorted(
+            (
+                path
+                for path in folder.glob("*.bmp")
+                if path.name.lower() not in DERIVED_OUTPUT_NAMES
+            ),
+        )
     if not image_paths:
         return None
 
-    images = [QImage(str(path)).convertToFormat(QImage.Format.Format_RGB32) for path in image_paths]
+    images = [rotate_qimage_180(QImage(str(path)).convertToFormat(QImage.Format.Format_RGB32)) for path in image_paths]
     if any(image.isNull() for image in images):
         return None
+
+    crop_window = None
 
     offsets = [0]
     for image in images[:-1]:
@@ -43,20 +118,74 @@ def stitch_board_folder(
         crop_y_margin_percent=crop_y_margin_percent,
         final_crop_x_margin_percent=final_crop_x_margin_percent,
         active_threshold_percent=active_threshold_percent,
+        left_edge_anchor_px=left_edge_anchor_px,
     )
+    original_canvas_width = canvas.width()
+    original_canvas_height = canvas.height()
     if final_crop_rect is not None:
         canvas = canvas.copy(*final_crop_rect)
+    canvas = rotate_qimage_180(canvas)
 
     output_path = folder / "stitched.bmp"
-    canvas.save(str(output_path), "BMP")
+    temp_output_path = folder / "stitched.tmp.bmp"
+    if not canvas.save(str(temp_output_path), "BMP"):
+        return None
+    temp_output_path.replace(output_path)
 
     if on_log is not None:
+        mode_text = "ai-ready crop + finalny crop" if stitch_mode == "ai_ready" else "pelne doklejanie + finalny crop"
+        crop_suffix = ""
+        if crop_window is not None:
+            crop_suffix = f", x={crop_window[0]}..{crop_window[1]}"
         on_log(
             f"Scalono {len(image_paths)} zdjec do {output_path.name} "
-            f"(tryb: pelne doklejanie + finalny crop, xmax={int(max_horizontal_shift_px)}px)"
+            f"(tryb: {mode_text}, xmax={int(max_horizontal_shift_px)}px{crop_suffix})"
         )
 
-    return output_path
+    if not return_metadata:
+        return output_path
+
+    return output_path, {
+        "source_image_count": len(image_paths),
+        "pre_crop_window": crop_window,
+        "final_crop_rect": final_crop_rect,
+        "canvas_width_before_final_crop": original_canvas_width,
+        "canvas_height_before_final_crop": original_canvas_height,
+        "stitched_width": canvas.width(),
+        "stitched_height": canvas.height(),
+    }
+
+
+def _crop_images_for_ai_ready_stitch(
+    images,
+    crop_x_margin_percent=4,
+    active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+):
+    if not images:
+        return images, None
+
+    bounds = []
+    min_width = min(image.width() for image in images)
+    for image in images:
+        left, right = _estimate_final_horizontal_bounds(
+            image,
+            crop_x_margin_percent=crop_x_margin_percent,
+            final_crop_x_margin_percent=0,
+            active_threshold_percent=active_threshold_percent,
+            left_edge_anchor_px=left_edge_anchor_px,
+        )
+        bounds.append((left, right))
+
+    # Keep the pre-stitch crop conservative: remove only background that is
+    # outside every source frame's detected board span.
+    left = min(bound[0] for bound in bounds)
+    right = max(bound[1] for bound in bounds)
+    left = max(0, min(min_width - 1, left))
+    right = max(left + 1, min(min_width, right))
+
+    cropped_images = [image.copy(left, 0, right - left, image.height()) for image in images]
+    return cropped_images, (left, right)
 
 
 def _compute_column_means(image):
@@ -267,12 +396,14 @@ def _estimate_final_board_crop_rect(
     crop_y_margin_percent=2,
     final_crop_x_margin_percent=3,
     active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
 ):
     left, right = _estimate_final_horizontal_bounds(
         image,
         crop_x_margin_percent=crop_x_margin_percent,
         final_crop_x_margin_percent=final_crop_x_margin_percent,
         active_threshold_percent=active_threshold_percent,
+        left_edge_anchor_px=left_edge_anchor_px,
     )
     row_means = _compute_row_means_center(image, left, right, keep_ratio=0.55)
     first_active_row, last_active_row = _estimate_board_vertical_bounds(row_means, image.height())
@@ -297,20 +428,62 @@ def _estimate_final_horizontal_bounds(
     crop_x_margin_percent=4,
     final_crop_x_margin_percent=3,
     active_threshold_percent=28,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
 ):
     image = image.convertToFormat(QImage.Format.Format_RGB32)
     width = image.width()
     column_means = _compute_column_means(image)
-    left_edge, right_edge = _estimate_active_horizontal_bounds(
+    detected_left_edge, right_edge = _estimate_active_horizontal_bounds(
         column_means,
         width,
         active_threshold_percent=active_threshold_percent,
     )
-
-    detected_width = max(1, right_edge - left_edge)
-    total_margin_percent = max(0.0, crop_x_margin_percent) + max(0.0, final_crop_x_margin_percent)
+    left = max(0, min(width - 1, int(detected_left_edge)))
+    detected_width = max(1, right_edge - left)
+    total_margin_percent = max(0.0, crop_x_margin_percent) + max(
+        0.0, final_crop_x_margin_percent
+    )
+    margin_left = max(2, int(detected_width * max(0.0, crop_x_margin_percent) / 100.0))
     margin_x = max(2, int(detected_width * total_margin_percent / 100.0))
-    left = max(0, left_edge - margin_x)
+    left = max(0, left - margin_left)
     right = min(width, right_edge + margin_x)
+    right = max(left + 1, right)
 
     return left, right
+
+
+def _estimate_left_edge_near_anchor(
+    column_means,
+    image_width,
+    fallback_left_edge,
+    left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+):
+    x_step = 8
+    sample_count = len(column_means)
+    if sample_count < 3:
+        return max(0, min(image_width - 1, fallback_left_edge))
+
+    anchor_index = max(1, min(sample_count - 2, int(left_edge_anchor_px // x_step)))
+    radius_indices = max(2, int(LEFT_EDGE_SEARCH_RADIUS_PX // x_step))
+    start = max(1, anchor_index - radius_indices)
+    stop = min(sample_count - 2, anchor_index + radius_indices)
+
+    best_index = None
+    best_rise = float("-inf")
+    for index in range(start, stop + 1):
+        rise = column_means[index + 1] - column_means[index]
+        distance_penalty = abs(index - anchor_index) * 0.35
+        score = rise - distance_penalty
+        if score > best_rise:
+            best_rise = score
+            best_index = index + 1
+
+    if best_index is None:
+        left_edge = fallback_left_edge
+    else:
+        left_edge = best_index * x_step
+
+    max_allowed_shift = LEFT_EDGE_SEARCH_RADIUS_PX
+    anchor_px = max(0, min(image_width - 1, int(left_edge_anchor_px)))
+    left_edge = max(anchor_px - max_allowed_shift, min(anchor_px + max_allowed_shift, left_edge))
+    return max(0, min(image_width - 1, left_edge))

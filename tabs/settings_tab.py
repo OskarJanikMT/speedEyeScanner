@@ -45,17 +45,22 @@ class SettingsTab(QWidget):
         self.plc_address_input = QLineEdit()
         self.plc_port_input = QLineEdit()
         self.save_directory_input = QLineEdit()
+        self.ai_model_path_input = QLineEdit()
         self.camera_enabled_input = QCheckBox("Wlacz kamere Baumer")
         self.camera_serial_input = QLineEdit()
         self.camera_output_directory_input = QLineEdit()
         self.camera_timeout_input = QSpinBox()
         self.camera_reconnect_input = QDoubleSpinBox()
-        self.yolo_threshold_slider = QSlider(Qt.Horizontal)
-        self.yolo_threshold_value = QLabel("0.45")
+        self.yolo_threshold_input = QDoubleSpinBox()
+        self.knot_confidence_input = QDoubleSpinBox()
+        self.knot_min_area_input = QSpinBox()
+        self.knot_max_area_input = QSpinBox()
         self.camera_exposure_input = QSpinBox()
         self.camera_gain_input = QDoubleSpinBox()
         self.camera_brightness_input = QSpinBox()
         self.board_stitch_max_x_shift_input = QSpinBox()
+        self.board_left_edge_anchor_input = QSpinBox()
+        self.cut_bad_zone_offset_input = QSpinBox()
         self.board_crop_x_margin_slider = QSlider(Qt.Horizontal)
         self.board_crop_y_margin_slider = QSlider(Qt.Horizontal)
         self.board_final_crop_x_margin_slider = QSlider(Qt.Horizontal)
@@ -65,6 +70,7 @@ class SettingsTab(QWidget):
             "plc_address": self.plc_address_input,
             "plc_port": self.plc_port_input,
             "save_directory": self.save_directory_input,
+            "ai_model_path": self.ai_model_path_input,
             "camera_serial_number": self.camera_serial_input,
             "camera_output_directory": self.camera_output_directory_input,
         }
@@ -76,6 +82,12 @@ class SettingsTab(QWidget):
             "camera_receive_timeout_ms": self.camera_timeout_input,
             "camera_reconnect_interval": self.camera_reconnect_input,
             "board_stitch_max_horizontal_shift_px": self.board_stitch_max_x_shift_input,
+            "board_stitch_left_edge_anchor_px": self.board_left_edge_anchor_input,
+            "cut_bad_zone_offset_mm": self.cut_bad_zone_offset_input,
+            "yolo_threshold": self.yolo_threshold_input,
+            "knot_confidence_threshold": self.knot_confidence_input,
+            "knot_min_box_area_px": self.knot_min_area_input,
+            "knot_max_box_area_px": self.knot_max_area_input,
         }
         self.slider_setting_inputs = {
             "board_stitch_crop_x_margin_percent": self.board_crop_x_margin_slider,
@@ -87,6 +99,7 @@ class SettingsTab(QWidget):
         self.plc_address_input.setPlaceholderText("np. 192.168.3.250")
         self.plc_port_input.setPlaceholderText("np. 5000")
         self.save_directory_input.setPlaceholderText("np. C:/SpeedEyeScanner/scany")
+        self.ai_model_path_input.setPlaceholderText("np. D:/SpeedEyeWoodTraining/runs/merged_tiled_continue_20260824/weights/best.onnx")
         self.camera_serial_input.setPlaceholderText("np. 70012345")
         self.camera_output_directory_input.setPlaceholderText(
             "puste = uzyj katalogu zapisu zdjec"
@@ -119,13 +132,36 @@ class SettingsTab(QWidget):
         self.board_stitch_max_x_shift_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.board_stitch_max_x_shift_input.setSuffix(" px")
         self.board_stitch_max_x_shift_input.setValue(36)
+        self.board_left_edge_anchor_input.setRange(0, 1000)
+        self.board_left_edge_anchor_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.board_left_edge_anchor_input.setSuffix(" px")
+        self.board_left_edge_anchor_input.setValue(100)
+        self.cut_bad_zone_offset_input.setRange(0, 1000)
+        self.cut_bad_zone_offset_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.cut_bad_zone_offset_input.setSuffix(" mm")
+        self.cut_bad_zone_offset_input.setValue(120)
         self.board_crop_x_margin_slider.setRange(0, 15)
         self.board_crop_y_margin_slider.setRange(0, 10)
         self.board_final_crop_x_margin_slider.setRange(0, 10)
         self.board_active_threshold_slider.setRange(5, 60)
-        self.yolo_threshold_slider.setRange(0, 100)
-        self.yolo_threshold_slider.setValue(45)
-        self.yolo_threshold_slider.valueChanged.connect(self.handle_yolo_threshold_change)
+        self.yolo_threshold_input.setRange(0.0, 1.0)
+        self.yolo_threshold_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.yolo_threshold_input.setDecimals(4)
+        self.yolo_threshold_input.setSingleStep(0.0005)
+        self.yolo_threshold_input.setValue(0.2500)
+        self.knot_confidence_input.setRange(0.0, 1.0)
+        self.knot_confidence_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.knot_confidence_input.setDecimals(4)
+        self.knot_confidence_input.setSingleStep(0.0005)
+        self.knot_confidence_input.setValue(0.2500)
+        self.knot_min_area_input.setRange(0, 200000)
+        self.knot_min_area_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.knot_min_area_input.setSuffix(" px2")
+        self.knot_min_area_input.setValue(400)
+        self.knot_max_area_input.setRange(0, 200000)
+        self.knot_max_area_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.knot_max_area_input.setSuffix(" px2")
+        self.knot_max_area_input.setValue(0)
         self.camera_enabled_input.toggled.connect(
             lambda checked: self.save_setting("camera_enabled", "true" if checked else "false")
         )
@@ -137,12 +173,6 @@ class SettingsTab(QWidget):
         plc_layout.addWidget(QLabel(":"))
         plc_layout.addWidget(self.plc_port_input)
         self.plc_connection_layout = plc_layout
-
-        threshold_layout = QHBoxLayout()
-        threshold_layout.setContentsMargins(0, 0, 0, 0)
-        threshold_layout.addWidget(self.yolo_threshold_slider)
-        threshold_layout.addWidget(self.yolo_threshold_value)
-        self.ai_threshold_layout = threshold_layout
 
         self.board_crop_x_margin_layout = self.create_slider_layout(
             self.board_crop_x_margin_slider,
@@ -202,6 +232,12 @@ class SettingsTab(QWidget):
         self.board_stitch_max_x_shift_input.setValue(
             self.settings_store.get_int("board_stitch_max_horizontal_shift_px", 36)
         )
+        self.board_left_edge_anchor_input.setValue(
+            self.settings_store.get_int("board_stitch_left_edge_anchor_px", 100)
+        )
+        self.cut_bad_zone_offset_input.setValue(
+            self.settings_store.get_int("cut_bad_zone_offset_mm", 120)
+        )
         self.board_crop_x_margin_slider.setValue(
             self.settings_store.get_int("board_stitch_crop_x_margin_percent", 4)
         )
@@ -224,15 +260,25 @@ class SettingsTab(QWidget):
             self.settings_store.get("camera_enabled", "false").lower() == "true"
         )
 
-        threshold_text = self.settings_store.get("yolo_threshold", "0.45")
+        threshold_text = self.settings_store.get("yolo_threshold", "0.2500")
         try:
             threshold_value = float(threshold_text)
         except ValueError:
-            threshold_value = 0.45
+            threshold_value = 0.2500
+        self.yolo_threshold_input.setValue(max(0.0, min(1.0, threshold_value)))
 
-        slider_value = max(0, min(100, int(round(threshold_value * 100))))
-        self.yolo_threshold_slider.setValue(slider_value)
-        self.update_yolo_threshold_label(slider_value)
+        knot_confidence_text = self.settings_store.get("knot_confidence_threshold", "0.2500")
+        try:
+            knot_confidence_value = float(knot_confidence_text)
+        except ValueError:
+            knot_confidence_value = 0.2500
+        self.knot_confidence_input.setValue(max(0.0, min(1.0, knot_confidence_value)))
+        self.knot_min_area_input.setValue(
+            self.settings_store.get_int("knot_min_box_area_px", 400)
+        )
+        self.knot_max_area_input.setValue(
+            self.settings_store.get_int("knot_max_box_area_px", 0)
+        )
 
     def save_setting(self, key, value):
         self.settings_store.set(key, value)
@@ -299,7 +345,41 @@ class SettingsTab(QWidget):
 
         ai_form_layout = QFormLayout()
         ai_form_layout.setSpacing(12)
-        ai_form_layout.addRow("Prog wykrywania sekow:", self.ai_threshold_layout)
+        ai_form_layout.addRow(
+            self.create_tooltip_label(
+                "Prog modelu YOLO:",
+                "Minimalny confidence, od ktorego model w ogole zwraca kandydatow.",
+            ),
+            self.yolo_threshold_input,
+        )
+        ai_form_layout.addRow(
+            self.create_tooltip_label(
+                "Min. confidence sęka:",
+                "Detekcje ponizej tej wartosci nie beda liczone ani rysowane na czerwono.",
+            ),
+            self.knot_confidence_input,
+        )
+        ai_form_layout.addRow(
+            self.create_tooltip_label(
+                "Min. pole sęka:",
+                "Odrzuca bardzo male detekcje na podstawie pola boxa w pikselach.",
+            ),
+            self.knot_min_area_input,
+        )
+        ai_form_layout.addRow(
+            self.create_tooltip_label(
+                "Max. pole sęka:",
+                "Odrzuca bardzo duze detekcje. Wartosc 0 oznacza brak limitu.",
+            ),
+            self.knot_max_area_input,
+        )
+        ai_form_layout.addRow(
+            self.create_tooltip_label(
+                "Sciezka modelu AI:",
+                "Pelna sciezka do aktualnie uzywanego modelu .pt albo .onnx. Puste pole = domyslne D:/SpeedEyeWoodTraining/runs/datasetV1_tiled_v1/weights/best.pt. Zmiana przeladuje model przy kolejnym skanie.",
+            ),
+            self.ai_model_path_input,
+        )
         ai_form_layout.addRow("Katalog zapisu zdjec:", self.save_directory_input)
 
         ai_panel_layout.addLayout(ai_form_layout)
@@ -337,6 +417,20 @@ class SettingsTab(QWidget):
         )
         camera_form_layout.addRow(
             self.create_tooltip_label(
+                "Kotwica lewej krawedzi:",
+                "Przyblizona pozycja lewej krawedzi deski. Algorytm szuka krawedzi lokalnie w okolicy tej pozycji, a nie na calym obrazie.",
+            ),
+            self.board_left_edge_anchor_input,
+        )
+        camera_form_layout.addRow(
+            self.create_tooltip_label(
+                "+margines ciecia:",
+                "Poszerza obszar odrzutu przed i za sekami o zadany zapas dla pily.",
+            ),
+            self.cut_bad_zone_offset_input,
+        )
+        camera_form_layout.addRow(
+            self.create_tooltip_label(
                 "Margines X crop klatki:",
                 "Dodaje boczny zapas do wykrytej szerokosci deski w pojedynczej klatce.",
             ),
@@ -367,13 +461,6 @@ class SettingsTab(QWidget):
         camera_layout.addLayout(camera_form_layout)
 
         return camera_panel
-
-    def handle_yolo_threshold_change(self, value):
-        self.update_yolo_threshold_label(value)
-        self.save_setting("yolo_threshold", f"{value / 100:.2f}")
-
-    def update_yolo_threshold_label(self, value):
-        self.yolo_threshold_value.setText(f"{value / 100:.2f}")
 
     def handle_slider_setting_change(self, key, value):
         label = self.slider_value_labels.get(self.slider_setting_inputs[key])

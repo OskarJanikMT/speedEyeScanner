@@ -17,12 +17,14 @@ class CameraSettings:
     enabled: bool = False
     serial_number: str = ""
     output_directory: str = ""
+    width_px: int = 2000
+    height_px: int = 976
     exposure_us: int = 1200
     gain_value: float = 1.8
     brightness_value: int = 50
     receive_timeout_ms: int = 1000
     reconnect_interval_seconds: float = 3.0
-    queue_size: int = 64
+    queue_size: int = 256
 
 
 @dataclass
@@ -58,9 +60,12 @@ class BaumerCameraManager:
         )
         self._sequence_lock = threading.Lock()
         self._sequence = 0
-        self._last_frame_id = None
         self._last_timeout_log_at = 0.0
         self._queue_full_logged = False
+        self._received_frames_count = 0
+        self._saved_frames_count = 0
+        self._save_errors_count = 0
+        self._last_received_monotonic = None
         self._neoapi = None
         self._camera = None
         self._state = self.STATE_DISCONNECTED
@@ -237,20 +242,23 @@ class BaumerCameraManager:
                 pass
 
     def _configure_runtime_features(self):
-        trigger_mode = self._feature_get("TriggerMode")
-        trigger_mode_on = self._enum_constant("TriggerMode_On")
-        if trigger_mode is not None and trigger_mode_on is not None and trigger_mode != trigger_mode_on:
-            self._log(
-                f"TriggerMode is {self._format_feature_value('TriggerMode', trigger_mode)}, attempting to switch to On"
-            )
-            self._feature_set("TriggerMode", trigger_mode_on)
-            trigger_mode = self._feature_get("TriggerMode")
-
+        self._configure_trigger_features()
+        self._configure_transport_features()
+        self._configure_image_geometry()
+        self._configure_line4_output()
         self._apply_manual_image_settings()
 
+        trigger_selector = self._feature_get("TriggerSelector")
+        trigger_mode = self._feature_get("TriggerMode")
         trigger_source = self._feature_get("TriggerSource")
         trigger_activation = self._feature_get("TriggerActivation")
+        trigger_delay = self._feature_get("TriggerDelay")
+        packet_size = self._feature_get("GevSCPSPacketSize")
+        packet_delay = self._feature_get("GevSCPD")
+        throughput_limit = self._feature_get("DeviceLinkThroughputLimit")
 
+        if trigger_selector is not None:
+            self._log(f"TriggerSelector: {self._format_feature_value('TriggerSelector', trigger_selector)}")
         if trigger_mode is not None:
             self._log(
                 f"TriggerMode: {self._format_feature_value('TriggerMode', trigger_mode)}"
@@ -263,6 +271,107 @@ class BaumerCameraManager:
             self._log(
                 f"TriggerActivation: {self._format_feature_value('TriggerActivation', trigger_activation)}"
             )
+        if trigger_delay is not None:
+            self._log(f"TriggerDelay: {trigger_delay}")
+        if packet_size is not None:
+            self._log(f"GevSCPSPacketSize: {packet_size}")
+        if packet_delay is not None:
+            self._log(f"GevSCPD: {packet_delay}")
+        if throughput_limit is not None:
+            self._log(f"DeviceLinkThroughputLimit: {throughput_limit}")
+
+    def _configure_image_geometry(self):
+        width_px = max(1, int(self.settings.width_px))
+        height_px = max(1, int(self.settings.height_px))
+
+        width_set = self._feature_set_numeric_clamped("Width", width_px)
+        height_set = self._feature_set_numeric_clamped("Height", height_px)
+
+        if width_set or height_set:
+            current_width = self._feature_get("Width")
+            current_height = self._feature_get("Height")
+            self._log(
+                f"Image size set to {current_width or width_px}x{current_height or height_px}"
+            )
+
+    def _configure_line4_output(self):
+        line_selector_line4 = self._enum_constant("LineSelector_Line4")
+        if line_selector_line4 is not None:
+            self._feature_set("LineSelector", line_selector_line4)
+        else:
+            self._feature_set("LineSelector", "Line4")
+
+        line_inverter_targets = (
+            ("LineInverter", True),
+            ("LineLogic", True),
+        )
+        line_inverter_set = self._try_set_first_available(line_inverter_targets)
+
+        line_source_set = False
+        for candidate in ("UserOutput1", "User Output 1"):
+            if self._try_set_first_available((("LineSource", candidate),)):
+                line_source_set = True
+                break
+
+        if line_inverter_set or line_source_set:
+            current_line_inverter = self._feature_get("LineInverter")
+            current_line_source = self._feature_get("LineSource")
+            self._log(
+                "Line4 configured: "
+                f"LineInverter={current_line_inverter if current_line_inverter is not None else True}, "
+                f"LineSource={current_line_source if current_line_source is not None else 'User Output 1'}"
+            )
+
+    def _configure_trigger_features(self):
+        trigger_selector_frame_start = self._enum_constant("TriggerSelector_FrameStart")
+        if trigger_selector_frame_start is not None:
+            self._feature_set("TriggerSelector", trigger_selector_frame_start)
+
+        trigger_mode = self._feature_get("TriggerMode")
+        trigger_mode_on = self._enum_constant("TriggerMode_On")
+        if trigger_mode is not None and trigger_mode_on is not None and trigger_mode != trigger_mode_on:
+            self._log(
+                f"TriggerMode is {self._format_feature_value('TriggerMode', trigger_mode)}, attempting to switch to On"
+            )
+            self._feature_set("TriggerMode", trigger_mode_on)
+
+        trigger_source_line1 = self._enum_constant("TriggerSource_Line1")
+        if trigger_source_line1 is not None:
+            self._feature_set("TriggerSource", trigger_source_line1)
+
+        trigger_overlap_readout = self._enum_constant("TriggerOverlap_ReadOut")
+        if trigger_overlap_readout is not None:
+            self._feature_set("TriggerOverlap", trigger_overlap_readout)
+
+        self._try_set_first_available(
+            (
+                ("TriggerDelay", 0.0),
+                ("TriggerDelayAbs", 0.0),
+                ("LineDebouncerTime", 0.0),
+                ("LineDebouncerHighTimeAbs", 0.0),
+                ("LineDebouncerLowTimeAbs", 0.0),
+            )
+        )
+
+        short_exposure_enable = self._enum_constant("ShortExposureTimeEnable_On")
+        if short_exposure_enable is not None:
+            self._feature_set("ShortExposureTimeEnable", short_exposure_enable)
+        else:
+            self._try_set_first_available(
+                (
+                    ("ShortExposureTimeEnable", True),
+                )
+            )
+
+    def _configure_transport_features(self):
+        device_link_mode_on = self._enum_constant("DeviceLinkThroughputLimitMode_On")
+        if device_link_mode_on is not None:
+            self._feature_set("DeviceLinkThroughputLimitMode", device_link_mode_on)
+        self._feature_set_numeric_fraction("DeviceLinkThroughputLimit", 0.90)
+        self._feature_set_numeric_max("GevSCPSPacketSize")
+        # Keep a small gap between GigE packets so the host NIC/driver can recover.
+        self._feature_set_numeric_clamped("GevSCPD", preferred_value=7200)
+        self._feature_set_numeric_clamped("InterPacketDelay", preferred_value=7200)
 
     def _apply_manual_image_settings(self):
         exposure_us = int(max(0, self.settings.exposure_us))
@@ -320,34 +429,79 @@ class BaumerCameraManager:
             if image is None or image.IsEmpty():
                 continue
 
-            frame_id = self._extract_frame_id(image)
-            if frame_id is not None and frame_id == self._last_frame_id:
-                self._log(f"Duplicate frame ignored: {frame_id}")
-                continue
+            receive_monotonic = time.monotonic()
+            gap_ms = None
+            if self._last_received_monotonic is not None:
+                gap_ms = (receive_monotonic - self._last_received_monotonic) * 1000.0
+            self._last_received_monotonic = receive_monotonic
 
-            self._last_frame_id = frame_id
+            frame_identifiers = self._extract_frame_identifiers(image)
+            frame_id = frame_identifiers["frame_id"]
+            self._received_frames_count += 1
             received_at = datetime.now()
             metadata = {
                 "frame_id": frame_id,
+                "buffer_id": frame_identifiers["buffer_id"],
+                "image_index": frame_identifiers["image_index"],
                 "camera_timestamp": self._safe_image_call(image, "GetTimestamp"),
                 "received_at": received_at.isoformat(timespec="microseconds"),
                 "width": self._safe_image_call(image, "GetWidth"),
                 "height": self._safe_image_call(image, "GetHeight"),
                 "pixel_format": self._safe_image_call(image, "GetPixelFormat"),
-                "buffer_id": self._safe_image_call(image, "GetBufferID"),
-                "image_index": self._safe_image_call(image, "GetImageIndex"),
+                "received_frames_count": self._received_frames_count,
+                "saved_frames_count": self._saved_frames_count,
+                "receive_gap_ms": round(gap_ms, 3) if gap_ms is not None else None,
             }
-            self._log(f"hardware trigger image received frame id: {frame_id}")
+            self._log(
+                f"hardware trigger image received "
+                f"frame_id={frame_id} "
+                f"buffer_id={frame_identifiers['buffer_id']} "
+                f"image_index={frame_identifiers['image_index']} "
+                f"| received={self._received_frames_count} "
+                f"saved={self._saved_frames_count} "
+                f"save_errors={self._save_errors_count} "
+                f"gap_ms={round(gap_ms, 3) if gap_ms is not None else 'n/a'} "
+                f"queue={self._save_queue.qsize()}"
+            )
 
+            copy_started = time.monotonic()
             snapshot = CameraSnapshot(image=image.Copy(), metadata=metadata)
+            copy_ms = (time.monotonic() - copy_started) * 1000.0
+            snapshot.metadata["copy_ms"] = round(copy_ms, 3)
+            if copy_ms >= 20.0:
+                self._log(
+                    f"image copy slow "
+                    f"frame_id={frame_id} "
+                    f"| copy_ms={round(copy_ms, 3)} "
+                    f"received={self._received_frames_count} "
+                    f"saved={self._saved_frames_count} "
+                    f"queue={self._save_queue.qsize()}"
+                )
             while not self._stop_event.is_set():
                 try:
+                    put_started = time.monotonic()
                     self._save_queue.put(snapshot, timeout=0.5)
+                    put_ms = (time.monotonic() - put_started) * 1000.0
+                    if put_ms >= 20.0:
+                        self._log(
+                            f"save queue put slow "
+                            f"frame_id={frame_id} "
+                            f"| put_ms={round(put_ms, 3)} "
+                            f"received={self._received_frames_count} "
+                            f"saved={self._saved_frames_count} "
+                            f"queue={self._save_queue.qsize()}"
+                        )
                     self._queue_full_logged = False
                     break
                 except queue.Full:
                     if not self._queue_full_logged:
-                        self._log("save queue full - waiting for writer thread")
+                        self._log(
+                            "save queue full - waiting for writer thread "
+                            f"| received={self._received_frames_count} "
+                            f"saved={self._saved_frames_count} "
+                            f"save_errors={self._save_errors_count} "
+                            f"queue={self._save_queue.qsize()}"
+                        )
                         self._queue_full_logged = True
 
     def _writer_loop(self):
@@ -359,13 +513,32 @@ class BaumerCameraManager:
 
             try:
                 file_path = self._build_output_path()
+                save_started = time.monotonic()
                 snapshot.image.Save(str(file_path))
+                save_ms = (time.monotonic() - save_started) * 1000.0
+                self._saved_frames_count += 1
                 snapshot.metadata["file_path"] = str(file_path)
-                self._log(f"image saved: {file_path}")
+                snapshot.metadata["saved_frames_count"] = self._saved_frames_count
+                snapshot.metadata["save_ms"] = round(save_ms, 3)
+                self._log(
+                    f"image saved: {file_path} "
+                    f"| received={self._received_frames_count} "
+                    f"saved={self._saved_frames_count} "
+                    f"save_errors={self._save_errors_count} "
+                    f"save_ms={round(save_ms, 3)} "
+                    f"queue={self._save_queue.qsize()}"
+                )
                 if self.on_image_saved is not None:
                     self.on_image_saved(str(file_path), snapshot.metadata)
             except Exception as exc:
-                self._log(f"save error: {exc}")
+                self._save_errors_count += 1
+                self._log(
+                    f"save error: {exc} "
+                    f"| received={self._received_frames_count} "
+                    f"saved={self._saved_frames_count} "
+                    f"save_errors={self._save_errors_count} "
+                    f"queue={self._save_queue.qsize()}"
+                )
             finally:
                 self._save_queue.task_done()
 
@@ -417,11 +590,56 @@ class BaumerCameraManager:
         except Exception as exc:
             self._log(f"Cannot set {feature_name} to {value}: {exc}")
 
+    def _feature_set_numeric_max(self, feature_name: str):
+        if self._camera is None:
+            return False
+
+        try:
+            feature = getattr(self._camera.f, feature_name)
+            max_value = feature.GetMax()
+            feature.Set(max_value)
+            return True
+        except Exception:
+            return False
+
+    def _feature_set_numeric_fraction(self, feature_name: str, fraction: float):
+        if self._camera is None:
+            return False
+
+        try:
+            feature = getattr(self._camera.f, feature_name)
+            min_value = feature.GetMin()
+            max_value = feature.GetMax()
+            target = min_value + (max_value - min_value) * max(0.0, min(1.0, fraction))
+            if isinstance(min_value, int) and isinstance(max_value, int):
+                target = int(round(target))
+            feature.Set(target)
+            return True
+        except Exception:
+            return False
+
+    def _feature_set_numeric_clamped(self, feature_name: str, preferred_value):
+        if self._camera is None:
+            return False
+
+        try:
+            feature = getattr(self._camera.f, feature_name)
+            min_value = feature.GetMin()
+            max_value = feature.GetMax()
+            target = max(min_value, min(max_value, preferred_value))
+            if isinstance(min_value, int) and isinstance(max_value, int):
+                target = int(round(target))
+            feature.Set(target)
+            return True
+        except Exception:
+            return False
+
     def _enum_constant(self, name: str):
         return getattr(self._neoapi, name, None) if self._neoapi is not None else None
 
     def _format_feature_value(self, feature_name: str, value):
         prefix_map = {
+            "TriggerSelector": "TriggerSelector_",
             "TriggerMode": "TriggerMode_",
             "TriggerSource": "TriggerSource_",
             "TriggerActivation": "TriggerActivation_",
@@ -464,12 +682,21 @@ class BaumerCameraManager:
         except Exception:
             return False
 
-    def _extract_frame_id(self, image):
-        for method_name in ("GetFrameID", "GetBufferID", "GetImageIndex"):
-            value = self._safe_image_call(image, method_name)
-            if value not in (None, "", 0):
-                return value
-        return None
+    def _extract_frame_identifiers(self, image):
+        return {
+            "frame_id": self._normalize_frame_identifier(
+                self._safe_image_call(image, "GetFrameID")
+            ),
+            "buffer_id": self._normalize_frame_identifier(
+                self._safe_image_call(image, "GetBufferID")
+            ),
+            "image_index": self._normalize_frame_identifier(
+                self._safe_image_call(image, "GetImageIndex")
+            ),
+        }
+
+    def _normalize_frame_identifier(self, value):
+        return value if value not in (None, "", 0) else None
 
     def _safe_image_call(self, image, method_name: str):
         method = getattr(image, method_name, None)

@@ -7,6 +7,7 @@ set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "REQUIREMENTS_FILE=%PROJECT_DIR%requirements.txt"
 set "PYTHON_VERSION=3.13"
 set "PYTHON_WINGET_ID=Python.Python.3.13"
+set "PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128"
 
 if not exist "%REQUIREMENTS_FILE%" (
     echo [BLAD] Nie znaleziono pliku requirements.txt:
@@ -79,6 +80,15 @@ echo Aktualizacja pip...
 "%VENV_PYTHON%" -m pip install --upgrade pip
 if errorlevel 1 (
     echo [BLAD] Nie udalo sie zaktualizowac pip.
+    pause
+    exit /b 1
+)
+
+echo Instalacja PyTorch z oficjalnego repozytorium CUDA 12.8...
+"%VENV_PYTHON%" -m pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 --index-url %PYTORCH_INDEX_URL%
+if errorlevel 1 (
+    echo [BLAD] Instalacja PyTorch nie powiodla sie.
+    echo Sprawdz polaczenie z internetem i zgodnosc sterownikow GPU.
     pause
     exit /b 1
 )

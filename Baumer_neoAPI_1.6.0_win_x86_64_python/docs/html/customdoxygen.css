@@ -1,0 +1,841 @@
+h1, .h1, h2, .h2, h3, .h3 {
+    font-weight: 400 !important;
+    font-size: 26px !important;
+    color: #0062ae !important;
+}
+
+h1 {
+    color: #0062ae !important;
+    font-size: 22px !important;
+}
+
+h2, .h2 {
+    color: #0062ae !important;
+    font-size: 18px !important;
+    margin-top: 45px;
+}
+
+h3, .h3, h4, .h4 {
+    color: #0062ae !important;
+    font-size: 16px !important;
+    margin-top: 45px;
+}
+
+h4, .h4 {
+    font-weight: 400 !important;
+    color: #333 !important;
+    font-size: 16px !important;
+}
+
+ul#main-menu {
+    display: block !important;
+}
+
+li#searchBoxPos2 {
+    display: flex !important;
+    margin-right: 0px !important;
+}
+
+#doc-content {
+    overflow: visible !important;
+    height: 100% !important;
+}
+
+.panel {
+    border: none !important;
+    box-shadow: none;
+}
+
+div.sm-dox {
+    visibility:collapse !important;
+    height: 0px !important;
+}
+
+.sm-dox a span.sub-arrow {
+    position: absolute;
+    top: 50%;
+    margin-top: -14px;
+    left: auto;
+    right: 3px;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    font: bold 12px / 28px monospace !important;
+    text-align: center;
+    text-shadow: none;
+    background: rgba(255, 255, 255, 0.5);
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    border-radius: 5px
+}
+
+/* Handing of arrow-carets in the smart menus */
+.sm-dox a.highlighted span.sub-arrow:before {
+    display: block;
+    content: '-'
+}
+
+.sm-dox a span.sub-arrow {
+    top: 50%;
+    margin-top: -2px;
+    right: 12px;
+    width: 0;
+    height: 0;
+    border-width: 4px;
+    border-style: solid dashed dashed dashed;
+    border-color: #283a5d transparent transparent transparent;
+    background: transparent;
+    -moz-border-radius: 0;
+    -webkit-border-radius: 0;
+    border-radius: 0
+}
+
+.sm-dox a:hover span.sub-arrow {
+    border-color: red transparent transparent transparent
+}
+
+
+.sm-dox.sm-rtl a.has-submenu {
+    padding-right: 12px;
+    padding-left: 24px
+}
+
+.sm-dox.sm-rtl a span.sub-arrow {
+    right: auto;
+    left: 12px
+}
+
+.sm-dox.sm-rtl.sm-vertical a.has-submenu {
+    padding: 10px 20px
+}
+
+.sm-dox.sm-rtl.sm-vertical a span.sub-arrow {
+    right: auto;
+    left: 8px;
+    border-style: dashed solid dashed dashed;
+    border-color: transparent #555 transparent transparent
+}
+
+.sm-dox.sm-rtl ul a.has-submenu {
+    padding: 10px 20px !important
+}
+
+.sm-dox.sm-rtl ul a span.sub-arrow {
+    right: auto;
+    left: 8px;
+    border-style: dashed solid dashed dashed;
+    border-color: transparent #555 transparent transparent
+}
+
+.sm-dox.sm-vertical a.disabled {
+}
+
+.sm-dox.sm-vertical a span.sub-arrow {
+    right: 8px;
+    top: 50%;
+    margin-top: -5px;
+    border-width: 5px;
+    border-style: dashed dashed dashed solid;
+    border-color: transparent transparent transparent #555
+}
+.sm-dox ul a span.sub-arrow {
+    right: 8px;
+    top: 50%;
+    margin-top: -5px;
+    border-width: 5px;
+    border-color: transparent transparent transparent #555;
+    border-style: dashed dashed dashed solid
+}
+
+#navrow1, #navrow2, #navrow3, #navrow4, #navrow5{
+    border-bottom: 1px solid #EEEEEE;
+}
+
+.adjust-right {
+margin-left: 30px !important;
+font-size: 1.15em !important;
+}
+
+.navbar {
+ border: 0px solid #222 !important;
+}
+
+table {
+    white-space:pre-wrap !important;
+}
+
+table.params {
+    white-space:normal !important;
+}
+
+/*
+ ===========================
+ */
+
+
+/* Sticky footer styles
+-------------------------------------------------- */
+html,
+body {
+    height: 100%;
+    /* The html and body elements cannot have any padding or margin. */
+}
+
+/* Wrapper for page content to push down footer */
+#wrap {
+    min-height: 100%;
+    height: auto;
+    /* Negative indent footer by its height */
+    margin: 0 auto -60px;
+    /* Pad bottom by footer height */
+    padding: 0 0 60px;
+}
+
+/* Set the fixed height of the footer here */
+#footer {
+    font-size: 0.9em;
+    padding: 8px 0px;
+    background-color: #f5f5f5;
+}
+
+.footer-row {
+    line-height: 44px;
+}
+
+#footer > .container {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.footer-follow-icon {
+    margin-left: 3px;
+    text-decoration: none !important;
+}
+
+.footer-follow-icon img {
+    width: 20px;
+}
+
+.footer-link {
+    padding-top: 5px;
+    display: inline-block;
+    color: #999999;
+    text-decoration: none;
+}
+
+.footer-copyright {
+    text-align: center;
+}
+
+
+@media (min-width: 992px) {
+    .footer-row {
+        text-align: left;
+    }
+
+    .footer-icons {
+        text-align: right;
+    }
+}
+@media (max-width: 991px) {
+    .footer-row {
+        text-align: center;
+    }
+
+    .footer-icons {
+        text-align: center;
+    }
+}
+
+/* DOXYGEN Code Styles
+----------------------------------- */
+
+
+a.qindex {
+    font-weight: bold;
+}
+
+a.qindexHL {
+    font-weight: bold;
+    background-color: #9CAFD4;
+    color: #ffffff;
+    border: 1px double #869DCA;
+}
+
+.contents a.qindexHL:visited {
+    color: #ffffff;
+}
+
+a.code, a.code:visited, a.line, a.line:visited {
+    color: #4665A2;
+}
+
+a.codeRef, a.codeRef:visited, a.lineRef, a.lineRef:visited {
+    color: #4665A2;
+}
+
+/* @end */
+
+dl.el {
+    margin-left: -1cm;
+}
+
+pre.fragment {
+    border: 1px solid #C4CFE5;
+    background-color: #FBFCFD;
+    padding: 4px 6px;
+    margin: 4px 8px 4px 2px;
+    overflow: auto;
+    word-wrap: break-word;
+    font-size:  9pt;
+    line-height: 125%;
+    font-family: monospace, fixed;
+    font-size: 105%;
+}
+
+div.fragment {
+    padding: 4px 6px;
+    margin: 4px 8px 4px 2px;
+    border: 1px solid #C4CFE5;
+}
+
+div.line {
+    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 12px;
+    min-height: 13px;
+    line-height: 1.0;
+    text-wrap: unrestricted;
+    white-space: -moz-pre-wrap; /* Moz */
+    white-space: -pre-wrap;     /* Opera 4-6 */
+    white-space: -o-pre-wrap;   /* Opera 7 */
+    white-space: pre-wrap;      /* CSS3  */
+    word-wrap: normal;      /* IE 5.5+ */
+    text-indent: -53px;
+    padding-left: 53px;
+    padding-bottom: 0px;
+    margin: 0px;
+    -webkit-transition-property: background-color, box-shadow;
+    -webkit-transition-duration: 0.5s;
+    -moz-transition-property: background-color, box-shadow;
+    -moz-transition-duration: 0.5s;
+    -ms-transition-property: background-color, box-shadow;
+    -ms-transition-duration: 0.5s;
+    -o-transition-property: background-color, box-shadow;
+    -o-transition-duration: 0.5s;
+    transition-property: background-color, box-shadow;
+    transition-duration: 0.5s;
+}
+div.line:hover{
+    background-color: #FBFF00;
+}
+
+div.line.glow {
+    background-color: cyan;
+    box-shadow: 0 0 10px cyan;
+}
+
+
+span.lineno {
+    padding-right: 4px;
+    text-align: right;
+    color:rgba(0,0,0,0.3);
+    border-right: 1px solid #EEE;
+    border-left: 1px solid #EEE;
+    background-color: #FFF;
+    white-space: pre;
+    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace ;
+}
+span.lineno a {
+    background-color: #FAFAFA;
+    cursor:pointer;
+}
+
+span.lineno a:hover {
+    background-color: #EFE200;
+    color: #1e1e1e;
+}
+
+div.groupHeader {
+    margin-left: 16px;
+    margin-top: 12px;
+    font-weight: bold;
+}
+
+div.groupText {
+    margin-left: 16px;
+    font-style: italic;
+}
+
+/* @group Code Colorization */
+
+span.keyword {
+    color: #008000
+}
+
+span.keywordtype {
+    color: #604020
+}
+
+span.keywordflow {
+    color: #e08000
+}
+
+span.comment {
+    color: #800000
+}
+
+span.preprocessor {
+    color: #806020
+}
+
+span.stringliteral {
+    color: #002080
+}
+
+span.charliteral {
+    color: #008080
+}
+
+span.vhdldigit {
+    color: #ff00ff
+}
+
+span.vhdlchar {
+    color: #000000
+}
+
+span.vhdlkeyword {
+    color: #700070
+}
+
+span.vhdllogic {
+    color: #ff0000
+}
+
+blockquote {
+    background-color: #F7F8FB;
+    border-left: 2px solid #9CAFD4;
+    margin: 0 24px 0 4px;
+    padding: 0 12px 0 16px;
+}
+
+/*---------------- Search Box */
+
+#search-box {
+  margin: 10px 0px;
+}
+#search-box .close {
+  display: none;
+  position: absolute;
+  right: 0px;
+  padding: 6px 12px;
+  z-index: 5;
+}
+
+/*---------------- Search results window */
+
+#search-results-window {
+  display: none;
+}
+
+iframe#MSearchResults {
+  width: 100%;
+  height: 15em;
+}
+
+.SRChildren {
+  padding-left: 3ex; padding-bottom: .5em
+}
+.SRPage .SRChildren {
+  display: none;
+}
+a.SRScope {
+  display: block;
+}
+a.SRSymbol:focus, a.SRSymbol:active,
+a.SRScope:focus, a.SRScope:active {
+  text-decoration: underline;
+}
+span.SRScope {
+  padding-left: 4px;
+}
+.SRResult {
+  display: none;
+}
+
+/* class and file list */
+.directory .icona,
+.directory .arrow {
+  height: auto;
+}
+.directory .icona .icon {
+  height: 16px;
+}
+.directory .icondoc {
+  background-position: 0px 0px;
+  height: 20px;
+}
+.directory .iconfopen {
+  background-position: 0px 0px;
+}
+.directory td.entry {
+  padding: 7px 8px 6px 8px;
+}
+
+.table > tbody > tr > td.memSeparator {
+  line-height: 0;
+  .table-hover;
+
+}
+
+.memItemLeft, .memTemplItemLeft {
+  white-space: normal;
+}
+
+/* enumerations */
+.panel-body thead > tr {
+  background-color: #e0e0e0;
+}
+
+/* todo lists */
+.todoname,
+.todoname a {
+  font-weight: bold;
+}
+
+/* Class title */
+.summary {
+  margin-top: 25px;
+}
+.page-header {
+  margin: 20px 0px !important;
+}
+.page-header .title {
+  display: inline-block;
+}
+.page-header .pull-right {
+  margin-top: 0.3em;
+  margin-left: 0.5em;
+}
+.page-header .label {
+  font-size: 50%;
+}
+
+@media print
+{
+  #top { display: none; }
+  #side-nav { display: none; }
+  #nav-path { display: none; }
+  body { overflow:visible; }
+  h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+  .summary { display: none; }
+  .memitem { page-break-inside: avoid; }
+  #doc-content
+  {
+    margin-left:0 !important;
+    height:auto !important;
+    width:auto !important;
+    overflow:inherit;
+    display:inline;
+  }
+}
+
+/* Changes for Baumer neoAPI */
+/* Changes for Baumer neoAPI below */
+/* Changes for Baumer neoAPI */
+
+/* roboto-slab-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto Slab';
+  font-style: normal;
+  font-weight: 400;
+  src: url('fonts/roboto-slab-v25-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+
+/* roboto-condensed-300 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto Condensed';
+  font-style: normal;
+  font-weight: 300;
+  src: url('fonts/roboto-condensed-v25-latin-300.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+
+/* roboto-condensed-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto Condensed';
+  font-style: normal;
+  font-weight: 400;
+  src: url('fonts/roboto-condensed-v25-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+
+body, table, div, p, dl {
+    font-family: "Roboto Condensed",roboto,helvetica,sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    color: #333     /*#6f6f6f;*/
+}
+
+#MSearchBox {
+    margin-top: 14px;
+    border: 1px solid #C4CFE5;
+    background: url(icn-search.svg) no-repeat 7px center;
+    
+    padding-left: 22px !important;
+    border-radius: 0px !important;
+    box-shadow: none !important;
+}
+
+#MSearchField {
+    font: 9pt Arial, Verdana, sans-serif;
+}
+
+#MSearchBox .left, #MSearchField, #MSearchSelectExt {
+    background: none !important;
+}
+
+#MSearchBox .right {
+    display: none;
+}
+
+.directory .levels {
+    display: none;
+    background: none;
+}
+
+.navbar-default .navbar-nav > li > a,
+.navbar-default .navbar-nav > li > a:link,
+.navbar-default .navbar-nav > li > a:visited,
+.navbar-default .navbar-nav > li > a:active,
+.navbar-default .navbar-nav > li > a:hover,
+.navbar-default .navbar-nav > li > a:focus,
+a, a:link, a:visited, a:active, a:hover, a:focus {
+    color: #0062ae !important;
+    text-decoration: none;
+    padding-bottom:0px;
+}
+
+.navbar-default .navbar-nav > li > a:hover,
+a:hover {
+    color: #0062ae;
+    text-decoration: none;
+}
+
+.navbar-default .navbar-nav > li > a {
+    margin-left: 0px;
+}
+
+.navbar-default .navbar-nav > li > a.neo {
+    text-decoration: none !important;
+}
+
+.navbar-default .navbar-nav > ul > li:last-of-type {
+    margin-left: 20px;
+}
+
+
+.summary {
+    display:none;
+    visibility:hidden;
+}
+
+.icon {
+    background-color: #0062ae;
+}
+
+.navbar-right {
+    margin-right: 0px;
+}
+
+
+.col-sm-12 {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.nav > ul:last-child {
+    margin-left: 5px;
+}
+
+.nav li {
+    float: left;
+}
+
+.nav li li {
+    float: none;
+}
+
+code,
+table.table > tbody > tr.active > td,
+.panel-default > .panel-heading,
+.breadcrumb {
+    background-color: #f7f7f7;
+
+}
+
+.navbar-default {
+    background-color: #ffffff;
+}
+
+.navbar .container {
+    min-height: 60px;
+}
+
+.navbar-brand {
+    padding-top: 0px;
+    padding-left: 0px;
+    white-space: nowrap;
+}
+
+.navbar-brand img {
+    padding-right: 6px;
+    display: inline;
+}
+
+.memtitle {
+    border: none;
+    background-image: none;
+    background-color: inherit;
+    margin-top: -2px;
+    color: #0062ae;
+    font-size: 170%;
+}
+
+h2.agroupheader {
+    font-size: 220%;
+    color: inherit;
+}
+
+dl.section.user dt {
+    color: #999999;
+    text-align:right;
+    font-weight: 100;
+    font-size:90%;
+}
+
+.label.label-info {
+    font-weight: 500;
+    font-size:100%;
+}
+
+div.directory {
+    border-top: 1px solid #C4CFE5;
+    border-bottom: 1px solid #C4CFE5;
+}
+
+h2.groupHeader {
+    border-bottom: 1px solid #C4CFE5;
+}
+
+div.directory > table > tbody > tr > td {
+    border:none;
+}
+
+blockquote {
+    margin-bottom: 4px;
+}
+tr.heading > td {
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+}
+div.panel-heading table {
+    white-space:normal !important;
+    width: auto !important;
+}
+
+span.pull-right, span.label-info {
+    margin-left: 8px;
+}
+
+div.title a {
+    font-size: 14px;
+}
+
+.well {
+    border-radius:0px;
+    width: 90%;
+}
+
+.panel {
+    border-radius: 0px;
+}
+
+table.memname td, table.exception td {
+    padding-right: 2px;
+}
+
+table.memname td:last-of-type {
+    width: 100%;
+}
+
+.navbar-brand {
+    font-size: 16px;
+}
+.navbar-right {
+    font-size: 16px;
+}
+
+
+@media (max-width: 767px) {
+    .navbar-brand {
+        font-size: 16px;
+    }
+    .navbar-right {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 550px) {
+    .ppull-right {
+        display: none;
+    }
+}
+
+@media (max-width: 350px) {
+    .navbar-brand {
+        font-size: 14px;
+    }
+    .navbar-right {
+        font-size: 14px;
+    }
+
+.directory td.desc, .pull-right {
+    display: none;
+    }
+}
+
+.panel-body {
+    padding-bottom: 0px;
+}
+
+dl.user {
+    margin-bottom: 8px;
+}
+
+.sharp {
+    font-weight: normal;
+}
+
+.caption {
+    width: 90%;
+    margin: auto auto;
+    padding-right: 10px;
+    padding-bottom: 7px;
+    text-align: right;
+    font-weight: normal;
+    font-size: 80%;
+}
+
+div.line {
+    font-size: 14px;
+}
+
+div.toc {
+    padding: 14px 5px;
+}
+
+div.toc li.level2, div.toc li.level3 {
+    margin-left: 5px;
+}

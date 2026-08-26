@@ -1,0 +1,314 @@
+[Version]
+Signature="$Windows NT$"
+Provider=%S_Provider%
+DriverVer=08/18/2023,2.90.0.0
+CatalogFile=baumer_usb_x64.cat
+Class=BaumerUSBControlledDevices
+ClassGUID={387F3794-C81A-472d-B930-21D92CA3B7E0}
+
+[ClassInstall32] 
+AddReg=_AddReg_ClassInstall
+
+[_AddReg_ClassInstall]
+HKR,,,,"%S_DeviceClassDisplayName%"
+HKR,,Icon,,"-20"
+
+[Manufacturer]
+%S_Mfg%=_Models, ntamd64
+
+[_Models.ntamd64]
+%S_DeviceDesc1%=_Install, USB\VID_04B4&PID_03F0
+%S_DeviceDesc2%=_Install, USB\VID_2825&PID_0001&MI_00
+%S_DeviceDesc3%=_Install, USB\VID_2825&PID_0002&MI_00
+%S_DeviceDesc4%=_Install, USB\VID_2825&PID_0100&MI_00
+%S_DeviceDesc5%=_Install, USB\VID_2825&PID_0101&MI_00
+%S_DeviceDesc6%=_Install, USB\VID_2825&PID_0102&MI_00
+%S_DeviceDesc7%=_Install, USB\VID_2825&PID_0103&MI_00
+%S_DeviceDesc8%=_Install, USB\VID_2825&PID_0104&MI_00
+%S_DeviceDesc9%=_Install, USB\VID_2825&PID_0105&MI_00
+%S_DeviceDesc10%=_Install, USB\VID_2825&PID_0106&MI_00
+%S_DeviceDesc11%=_Install, USB\VID_2825&PID_0107&MI_00
+%S_DeviceDesc12%=_Install, USB\VID_2825&PID_0108&MI_00
+%S_DeviceDesc13%=_Install, USB\VID_2825&PID_0109&MI_00
+%S_DeviceDesc14%=_Install, USB\VID_2825&PID_010A&MI_00
+%S_DeviceDesc15%=_Install, USB\VID_2825&PID_010B&MI_00
+%S_DeviceDesc16%=_Install, USB\VID_2825&PID_010C&MI_00
+%S_DeviceDesc17%=_Install, USB\VID_2825&PID_010D&MI_00
+%S_DeviceDesc18%=_Install, USB\VID_2825&PID_010E&MI_00
+%S_DeviceDesc19%=_Install, USB\VID_2825&PID_010F&MI_00
+%S_DeviceDesc20%=_Install, USB\VID_2825&PID_0110&MI_00
+%S_DeviceDesc21%=_Install, USB\VID_2825&PID_0111&MI_00
+%S_DeviceDesc22%=_Install, USB\VID_2825&PID_0112&MI_00
+%S_DeviceDesc23%=_Install, USB\VID_2825&PID_0113&MI_00
+%S_DeviceDesc24%=_Install, USB\VID_2825&PID_0114&MI_00
+%S_DeviceDesc25%=_Install, USB\VID_2825&PID_0115&MI_00
+%S_DeviceDesc26%=_Install, USB\VID_2825&PID_0116&MI_00
+%S_DeviceDesc27%=_Install, USB\VID_2825&PID_0117&MI_00
+%S_DeviceDesc28%=_Install, USB\VID_2825&PID_0118&MI_00
+%S_DeviceDesc29%=_Install, USB\VID_2825&PID_0119&MI_00
+%S_DeviceDesc30%=_Install, USB\VID_2825&PID_011A&MI_00
+%S_DeviceDesc31%=_Install, USB\VID_2825&PID_011B&MI_00
+%S_DeviceDesc32%=_Install, USB\VID_2825&PID_011C&MI_00
+%S_DeviceDesc33%=_Install, USB\VID_2825&PID_011D&MI_00
+%S_DeviceDesc34%=_Install, USB\VID_2825&PID_011E&MI_00
+%S_DeviceDesc35%=_Install, USB\VID_2825&PID_011F&MI_00
+%S_DeviceDesc36%=_Install, USB\VID_2825&PID_0120&MI_00
+%S_DeviceDesc37%=_Install, USB\VID_2825&PID_0121&MI_00
+%S_DeviceDesc38%=_Install, USB\VID_2825&PID_0122&MI_00
+%S_DeviceDesc39%=_Install, USB\VID_2825&PID_0123&MI_00
+%S_DeviceDesc40%=_Install, USB\VID_2825&PID_0124&MI_00
+%S_DeviceDesc41%=_Install, USB\VID_2825&PID_0125&MI_00
+%S_DeviceDesc42%=_Install, USB\VID_2825&PID_0126&MI_00
+%S_DeviceDesc43%=_Install, USB\VID_2825&PID_0127&MI_00
+%S_DeviceDesc44%=_Install, USB\VID_2825&PID_0128&MI_00
+%S_DeviceDesc45%=_Install, USB\VID_2825&PID_0129&MI_00
+%S_DeviceDesc46%=_Install, USB\VID_2825&PID_012A&MI_00
+%S_DeviceDesc47%=_Install, USB\VID_2825&PID_012B&MI_00
+%S_DeviceDesc48%=_Install, USB\VID_2825&PID_012C&MI_00
+%S_DeviceDesc49%=_Install, USB\VID_2825&PID_012D&MI_00
+%S_DeviceDesc50%=_Install, USB\VID_2825&PID_012E&MI_00
+%S_DeviceDesc51%=_Install, USB\VID_2825&PID_012F&MI_00
+%S_DeviceDesc52%=_Install, USB\VID_2825&PID_0130&MI_00
+%S_DeviceDesc53%=_Install, USB\VID_2825&PID_0131&MI_00
+%S_DeviceDesc54%=_Install, USB\VID_2825&PID_0132&MI_00
+%S_DeviceDesc55%=_Install, USB\VID_2825&PID_0133&MI_00
+%S_DeviceDesc56%=_Install, USB\VID_2825&PID_0134&MI_00
+%S_DeviceDesc57%=_Install, USB\VID_2825&PID_0135&MI_00
+%S_DeviceDesc58%=_Install, USB\VID_2825&PID_0136&MI_00
+%S_DeviceDesc59%=_Install, USB\VID_2825&PID_0137&MI_00
+%S_DeviceDesc60%=_Install, USB\VID_2825&PID_0138&MI_00
+%S_DeviceDesc61%=_Install, USB\VID_2825&PID_0139&MI_00
+%S_DeviceDesc62%=_Install, USB\VID_2825&PID_013A&MI_00
+%S_DeviceDesc63%=_Install, USB\VID_2825&PID_013B&MI_00
+%S_DeviceDesc64%=_Install, USB\VID_2825&PID_013C&MI_00
+%S_DeviceDesc65%=_Install, USB\VID_2825&PID_013D&MI_00
+%S_DeviceDesc66%=_Install, USB\VID_2825&PID_013E&MI_00
+%S_DeviceDesc67%=_Install, USB\VID_2825&PID_013F&MI_00
+%S_DeviceDesc68%=_Install, USB\VID_2825&PID_0140&MI_00
+%S_DeviceDesc69%=_Install, USB\VID_2825&PID_0141&MI_00
+%S_DeviceDesc70%=_Install, USB\VID_2825&PID_0142&MI_00
+%S_DeviceDesc71%=_Install, USB\VID_2825&PID_0143&MI_00
+%S_DeviceDesc72%=_Install, USB\VID_2825&PID_0144&MI_00
+%S_DeviceDesc73%=_Install, USB\VID_2825&PID_0145&MI_00
+%S_DeviceDesc74%=_Install, USB\VID_2825&PID_0146&MI_00
+%S_DeviceDesc75%=_Install, USB\VID_2825&PID_0147&MI_00
+%S_DeviceDesc76%=_Install, USB\VID_2825&PID_0148&MI_00
+%S_DeviceDesc77%=_Install, USB\VID_2825&PID_0149&MI_00
+%S_DeviceDesc78%=_Install, USB\VID_2825&PID_014A&MI_00
+%S_DeviceDesc79%=_Install, USB\VID_2825&PID_014B&MI_00
+%S_DeviceDesc80%=_Install, USB\VID_2825&PID_014C&MI_00
+%S_DeviceDesc81%=_Install, USB\VID_2825&PID_014D&MI_00
+%S_DeviceDesc82%=_Install, USB\VID_2825&PID_014E&MI_00
+%S_DeviceDesc83%=_Install, USB\VID_2825&PID_014F&MI_00
+%S_DeviceDesc84%=_Install, USB\VID_2825&PID_0151&MI_00
+%S_DeviceDesc85%=_Install, USB\VID_2825&PID_0152&MI_00
+%S_DeviceDesc86%=_Install, USB\VID_2825&PID_0153&MI_00
+%S_DeviceDesc87%=_Install, USB\VID_2825&PID_0154&MI_00
+%S_DeviceDesc88%=_Install, USB\VID_2825&PID_0155&MI_00
+%S_DeviceDesc89%=_Install, USB\VID_2825&PID_0156&MI_00
+%S_DeviceDesc90%=_Install, USB\VID_2825&PID_0157&MI_00
+%S_DeviceDesc91%=_Install, USB\VID_2825&PID_0158&MI_00
+%S_DeviceDesc92%=_Install, USB\VID_2825&PID_0150&MI_00
+%S_DeviceDesc93%=_Install, USB\VID_2825&PID_0159&MI_00
+%S_DeviceDesc94%=_Install, USB\VID_2825&PID_015A&MI_00
+%S_DeviceDesc95%=_Install, USB\VID_2825&PID_015B&MI_00
+%S_DeviceDesc96%=_Install, USB\VID_2825&PID_015C&MI_00
+%S_DeviceDesc97%=_Install, USB\VID_2825&PID_015D&MI_00
+%S_DeviceDesc98%=_Install, USB\VID_2825&PID_015E&MI_00
+%S_DeviceDesc99%=_Install, USB\VID_2825&PID_015F&MI_00
+%S_DeviceDesc100%=_Install, USB\VID_2825&PID_0160&MI_00
+%S_DeviceDesc101%=_Install, USB\VID_2825&PID_0161&MI_00
+%S_DeviceDesc102%=_Install, USB\VID_2825&PID_0162&MI_00
+%S_DeviceDesc103%=_Install, USB\VID_2825&PID_0163&MI_00
+%S_DeviceDesc104%=_Install, USB\VID_2825&PID_0167&MI_00
+%S_DeviceDesc105%=_Install, USB\VID_2825&PID_0168&MI_00
+%S_DeviceDesc106%=_Install, USB\VID_2825&PID_0169&MI_00
+%S_DeviceDesc107%=_Install, USB\VID_2825&PID_016A&MI_00
+%S_DeviceDesc108%=_Install, USB\VID_2825&PID_016B&MI_00
+%S_DeviceDesc109%=_Install, USB\VID_2825&PID_016C&MI_00
+%S_DeviceDesc110%=_Install, USB\VID_2825&PID_016D&MI_00
+%S_DeviceDesc111%=_Install, USB\VID_2825&PID_016E&MI_00
+%S_DeviceDesc112%=_Install, USB\VID_2825&PID_016F&MI_00
+%S_DeviceDesc113%=_Install, USB\VID_2825&PID_0170&MI_00
+%S_DeviceDesc114%=_Install, USB\VID_2825&PID_0171&MI_00
+
+[_Install.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_Install.ntamd64.Services]
+AddService = %S_ServiceName%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_Install.ntamd64.HW]
+AddReg=_AddReg_HW
+
+[_AddService_x64]
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\%S_DriverName_x64%.sys
+
+[_EventLog_x64]
+AddReg=_EventLog_x64_AddReg
+
+[_EventLog_x64_AddReg]
+HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\%S_DriverName_x64%.sys"
+HKR,,TypesSupported,  %REG_DWORD%,7
+
+[_AddReg_HW]
+HKR,,CleanupWizard_DeviceIdentString,%REG_SZ%,"{DAB6A146-D93E-48ab-B3E5-374AB8FFF277}"
+HKR,,DriverUserInterfaceGuid,%REG_SZ%,"{74053BE8-DAA4-4630-8941-2E69363D0982}"
+HKR,,PowerStateOnOpen,      %REG_DWORD%, 0
+HKR,,PowerStateOnClose,     %REG_DWORD%, 0
+HKR,,MinPowerStateUsed,     %REG_DWORD%, 3
+HKR,,MinPowerStateUnused,   %REG_DWORD%, 3
+HKR,,EnableRemoteWakeup,    %REG_DWORD%, 0
+HKR,,AbortPipesOnPowerDown, %REG_DWORD%, 1
+HKR,,UnconfigureOnClose,    %REG_DWORD%, 1
+HKR,,ResetDeviceOnClose,    %REG_DWORD%, 0
+HKR,,MaxIsoPackets,         %REG_DWORD%, 512
+HKR,,ShortTransferOk,       %REG_DWORD%, 1
+HKR,,RequestTimeout,        %REG_DWORD%, 1000
+HKR,,SuppressPnPRemoveDlg,  %REG_DWORD%, 1
+HKR,,ConfigDescMinQuerySize,%REG_DWORD%, 0
+
+[_CopyFiles_sys_x64]
+baumer_usb_x64.sys,,,0x00000004
+
+[DestinationDirs]
+DefaultDestDir =     12   ; %windir%\system32\drivers 
+_CopyFiles_sys_x64 = 12
+
+[SourceDisksNames.amd64]
+1=%S_DiskName%,,
+
+[SourceDisksFiles.amd64]
+baumer_usb_x64.sys=1,,,0x00000004
+
+[Strings]
+REG_SZ         = 0x00000000
+REG_MULTI_SZ   = 0x00010000
+REG_EXPAND_SZ  = 0x00020000
+REG_BINARY     = 0x00000001
+REG_DWORD      = 0x00010001
+
+S_Provider="Baumer"
+S_Mfg="Baumer"
+S_DeviceClassDisplayName="Baumer USB devices"
+S_DiskName="Baumer USB3 Driver Disk"
+S_ServiceName="Baumer_USB"
+S_DriverName_x64="baumer_usb_x64"
+
+S_DeviceDesc1="FX-Bootprogrammer"
+S_DeviceDesc2="MXU"
+S_DeviceDesc3="MXU/VLU"
+S_DeviceDesc4="MXU02"
+S_DeviceDesc5="MXU02c"
+S_DeviceDesc6="MXU12"
+S_DeviceDesc7="MXU12c"
+S_DeviceDesc8="MXU20"
+S_DeviceDesc9="MXU20c"
+S_DeviceDesc10="MXUC20"
+S_DeviceDesc11="MXUC20c"
+S_DeviceDesc12="MXUC40.2"
+S_DeviceDesc13="MXUC40c.2"
+S_DeviceDesc14="VLU-02M"
+S_DeviceDesc15="VLU-02C"
+S_DeviceDesc16="VLU-12M"
+S_DeviceDesc17="VLU-12C"
+S_DeviceDesc18="VLU-20M"
+S_DeviceDesc19="VLU-20C"
+S_DeviceDesc20="VLU-22M"
+S_DeviceDesc21="VLU-22C"
+S_DeviceDesc22="VLU-40M"
+S_DeviceDesc23="VLU-40C"
+S_DeviceDesc24="PXU-28M.Q"
+S_DeviceDesc25="PXU-28C.Q"
+S_DeviceDesc26="PXU-60M.Q"
+S_DeviceDesc27="PXU-60C.Q"
+S_DeviceDesc28="PXU-60M.D"
+S_DeviceDesc29="PXU-60C.D"
+S_DeviceDesc30="PXU-90M.Q"
+S_DeviceDesc31="PXU-90C.Q"
+S_DeviceDesc32="PXU-90M.D"
+S_DeviceDesc33="PXU-90C.D"
+S_DeviceDesc34="PXU-120M.Q"
+S_DeviceDesc35="PXU-120C.Q"
+S_DeviceDesc36="MXU03"
+S_DeviceDesc37="MXU03c"
+S_DeviceDesc38="VLU-03M"
+S_DeviceDesc39="VLU-03C"
+S_DeviceDesc40="PXU-60M.Q.K06"
+S_DeviceDesc41="PXU-120M.Q.K06"
+S_DeviceDesc42="VEXU-24M"
+S_DeviceDesc43="VEXU-24C"
+S_DeviceDesc44="VCXU-23M"
+S_DeviceDesc45="VCXU-23C"
+S_DeviceDesc46="VCXU-50M"
+S_DeviceDesc47="VCXU-50C"
+S_DeviceDesc48="DXU-50C.K04"
+S_DeviceDesc49="VEXU/VCXU"
+S_DeviceDesc50="VCXU-53M"
+S_DeviceDesc51="VCXU-53C"
+S_DeviceDesc52="VCXU-24M"
+S_DeviceDesc53="VCXU-24C"
+S_DeviceDesc54="VEXU-02M"
+S_DeviceDesc55="VEXU-02C"
+S_DeviceDesc56="VEXU-13M"
+S_DeviceDesc57="VEXU-13C"
+S_DeviceDesc58="VCXU-02C"
+S_DeviceDesc59="VCXU-02M"
+S_DeviceDesc60="VCXU-05C"
+S_DeviceDesc61="VCXU-05M"
+S_DeviceDesc62="VCXU-13C"
+S_DeviceDesc63="VCXU-13M"
+S_DeviceDesc64="VCXU-15C"
+S_DeviceDesc65="VCXU-15M"
+S_DeviceDesc66="VCXU-25C"
+S_DeviceDesc67="VCXU-25M"
+S_DeviceDesc68="VCXU-31C"
+S_DeviceDesc69="VCXU-31M"
+S_DeviceDesc70="VCXU-32C"
+S_DeviceDesc71="VCXU-32M"
+S_DeviceDesc72="VCXU-51C"
+S_DeviceDesc73="VCXU-51M"
+S_DeviceDesc74="VCXU-90C"
+S_DeviceDesc75="VCXU-90M"
+S_DeviceDesc76="VCXU-91C"
+S_DeviceDesc77="VCXU-91M"
+S_DeviceDesc78="VCXU-123C"
+S_DeviceDesc79="VCXU-123M"
+S_DeviceDesc80="VEXU-05C"
+S_DeviceDesc81="VEXU-05M"
+S_DeviceDesc82="VEXU-25C"
+S_DeviceDesc83="VEXU-25M"
+S_DeviceDesc84="VCXU-22M.R"
+S_DeviceDesc85="VCXU-22C.R"
+S_DeviceDesc86="VCXU-65M.R"
+S_DeviceDesc87="VCXU-65C.R"
+S_DeviceDesc88="VCXU-125M.R"
+S_DeviceDesc89="VCXU-125C.R"
+S_DeviceDesc90="VCXU-201M.R"
+S_DeviceDesc91="VCXU-201C.R"
+S_DeviceDesc92="VCXU-32M.K54"
+S_DeviceDesc93="VCXU-04M"
+S_DeviceDesc94="VCXU-04C"
+S_DeviceDesc95="VCXU-124M"
+S_DeviceDesc96="VCXU-124C"
+S_DeviceDesc97="VCXU-31M.K57"
+S_DeviceDesc98="VCXU-123M.K06"
+S_DeviceDesc99="VCXU-13M.HPM"
+S_DeviceDesc100="VCXU-51M.HPM"
+S_DeviceDesc101="PXU-60M.Q.K42"
+S_DeviceDesc102="VCXU-50MP"
+S_DeviceDesc103="VIXU-54M.R"
+S_DeviceDesc104="VCXU-123M.K70"
+S_DeviceDesc105="VCXU-201M.R.K71"
+S_DeviceDesc106="VCXU-50CP"
+S_DeviceDesc107="VCXU-57M"
+S_DeviceDesc108="VCXU-57C"
+S_DeviceDesc109="VCXU-127M"
+S_DeviceDesc110="VCXU-127C"
+S_DeviceDesc111="VCXU-241M"
+S_DeviceDesc112="VCXU-241C"
+S_DeviceDesc113="VCXU-23M.K76"
+S_DeviceDesc114="Baumer Device"

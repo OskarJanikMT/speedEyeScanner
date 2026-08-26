@@ -70,6 +70,7 @@ def stitch_board_folder(
     active_threshold_percent=28,
     left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
     stitch_mode="ai_ready",
+    preserve_vertical_span=False,
     on_log=None,
     return_metadata=False,
 ):
@@ -119,6 +120,7 @@ def stitch_board_folder(
         final_crop_x_margin_percent=final_crop_x_margin_percent,
         active_threshold_percent=active_threshold_percent,
         left_edge_anchor_px=left_edge_anchor_px,
+        preserve_vertical_span=preserve_vertical_span,
     )
     original_canvas_width = canvas.width()
     original_canvas_height = canvas.height()
@@ -397,6 +399,7 @@ def _estimate_final_board_crop_rect(
     final_crop_x_margin_percent=3,
     active_threshold_percent=28,
     left_edge_anchor_px=DEFAULT_LEFT_EDGE_ANCHOR_PX,
+    preserve_vertical_span=False,
 ):
     left, right = _estimate_final_horizontal_bounds(
         image,
@@ -405,13 +408,16 @@ def _estimate_final_board_crop_rect(
         active_threshold_percent=active_threshold_percent,
         left_edge_anchor_px=left_edge_anchor_px,
     )
-    row_means = _compute_row_means_center(image, left, right, keep_ratio=0.55)
-    first_active_row, last_active_row = _estimate_board_vertical_bounds(row_means, image.height())
-
-    detected_height = max(1, last_active_row - first_active_row)
-    margin_y = max(4, int(detected_height * max(0.0, crop_y_margin_percent) / 100.0))
-    top = max(0, first_active_row - margin_y)
-    bottom = min(image.height(), last_active_row + margin_y)
+    if preserve_vertical_span:
+        top = 0
+        bottom = image.height()
+    else:
+        row_means = _compute_row_means_center(image, left, right, keep_ratio=0.55)
+        first_active_row, last_active_row = _estimate_board_vertical_bounds(row_means, image.height())
+        detected_height = max(1, last_active_row - first_active_row)
+        margin_y = max(4, int(detected_height * max(0.0, crop_y_margin_percent) / 100.0))
+        top = max(0, first_active_row - margin_y)
+        bottom = min(image.height(), last_active_row + margin_y)
     left = max(0, left)
     right = min(image.width(), right)
     crop_width = max(1, right - left)

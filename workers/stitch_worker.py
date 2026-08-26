@@ -50,6 +50,10 @@ class StitchWorker(QObject):
         try:
             folder_path = request["folder_path"]
             self._prepare_board_folder(request)
+            scan_duration_ms = self._calculate_scan_duration_ms(
+                folder_path=folder_path,
+                ordered_filenames=[Path(path_text).name for path_text in request.get("source_paths", [])],
+            )
             started_at = perf_counter()
             stitch_result = stitch_board_folder(
                 folder_path,
@@ -61,6 +65,7 @@ class StitchWorker(QObject):
                 final_crop_x_margin_percent=request["final_crop_x_margin_percent"],
                 active_threshold_percent=request["active_threshold_percent"],
                 stitch_mode="ai_ready",
+                preserve_vertical_span=bool(request.get("has_placeholder_images")),
                 on_log=self.log.emit,
                 return_metadata=True,
             )
@@ -74,6 +79,7 @@ class StitchWorker(QObject):
             payload["stitched_path"] = stitched_path
             payload["elapsed_ms"] = elapsed_ms
             payload["stitch_metadata"] = stitch_metadata
+            payload["scan_duration_ms"] = scan_duration_ms
             if request.get("ai_enabled", True):
                 payload.update(
                     self._run_ai_detection(
@@ -127,6 +133,21 @@ class StitchWorker(QObject):
             self.log.emit(
                 f"Przeniesiono {moved_count} zdjec do folderu {destination_directory.name}"
             )
+
+    def _calculate_scan_duration_ms(self, folder_path, ordered_filenames):
+        folder = Path(folder_path)
+        timestamps = []
+        for filename in ordered_filenames or []:
+            image_path = folder / filename
+            if not image_path.exists():
+                continue
+            try:
+                timestamps.append(image_path.stat().st_mtime_ns)
+            except OSError:
+                continue
+        if len(timestamps) < 2:
+            return 0.0
+        return max(0.0, (max(timestamps) - min(timestamps)) / 1_000_000.0)
 
     def _delete_source_path_with_retries(self, source_path, attempts=10, delay_seconds=0.1):
         source_path = Path(source_path)

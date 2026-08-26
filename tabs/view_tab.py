@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,
+    QApplication,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -77,6 +78,8 @@ class ViewTab(QWidget):
         self._preview_results_by_board = {}
         self._last_stitch_ms = 0.0
         self._last_ai_ms = 0.0
+        self._last_edit_ms = 0.0
+        self._last_total_pipeline_ms = 0.0
         self._stitched_preview_active = False
         self._hover_zoom_size_px = 220
         self._hover_crop_size_px = 600
@@ -187,6 +190,8 @@ class ViewTab(QWidget):
         self.scan_time = QLabel("--- ms")
         self.ai_time = QLabel("--- ms")
         self.machine_ready_time = QLabel("--- ms")
+        self.edit_time = QLabel("--- ms")
+        self.total_time = QLabel("--- ms")
         self.scan_status = QLabel("OCZEKIWANIE")
 
         info_grid.addWidget(QLabel("ID deski:"), 0, 0)
@@ -199,8 +204,12 @@ class ViewTab(QWidget):
         info_grid.addWidget(self.ai_time, 3, 1)
         info_grid.addWidget(QLabel("Model -> maszyna:"), 4, 0)
         info_grid.addWidget(self.machine_ready_time, 4, 1)
-        info_grid.addWidget(QLabel("Status:"), 5, 0)
-        info_grid.addWidget(self.scan_status, 5, 1)
+        info_grid.addWidget(QLabel("Czas edycji:"), 5, 0)
+        info_grid.addWidget(self.edit_time, 5, 1)
+        info_grid.addWidget(QLabel("Laczny czas:"), 6, 0)
+        info_grid.addWidget(self.total_time, 6, 1)
+        info_grid.addWidget(QLabel("Status:"), 7, 0)
+        info_grid.addWidget(self.scan_status, 7, 1)
 
         scan_layout.addLayout(info_grid)
         scan_layout.addStretch()
@@ -551,6 +560,12 @@ class ViewTab(QWidget):
 
         if board_id:
             self.board_id.setText(board_id)
+            self.defect_count.setText("0")
+            self.scan_time.setText("--- ms")
+            self.ai_time.setText("--- ms")
+            self.machine_ready_time.setText("--- ms")
+            self.edit_time.setText("--- ms")
+            self.total_time.setText("--- ms")
             details = []
             if board_slot:
                 details.append(board_slot)
@@ -599,7 +614,6 @@ class ViewTab(QWidget):
                 self.image_view.setText(Path(file_path).name)
 
         self.scan_status.setText("OBRAZ ODEBRANY")
-        self.scan_time.setText("--- ms")
         self.add_log(
             f"Image received: frame={metadata.get('frame_id')} saved={file_path} "
             f"{event.get('summary', '')}"
@@ -636,6 +650,9 @@ class ViewTab(QWidget):
         )
         self.pending_stitch_jobs += 1
         self.ai_time.setText("PRACA...")
+        self.machine_ready_time.setText("PRACA...")
+        self.edit_time.setText("PRACA...")
+        self.total_time.setText("PRACA...")
         self.stitch_requested.emit(
             {
                 "board_id": event["board_id"],
@@ -714,7 +731,9 @@ class ViewTab(QWidget):
         stitched_path = result.get("stitched_path")
         stitch_ms = result.get("elapsed_ms", 0.0)
         self._last_stitch_ms = stitch_ms
-        self.ai_time.setText(f"S:{self._last_stitch_ms:.0f} / M:{self._last_ai_ms:.0f} ms")
+        scan_duration_ms = float(result.get("scan_duration_ms", 0.0) or 0.0)
+        if scan_duration_ms > 0.0:
+            self.scan_time.setText(f"{scan_duration_ms:.0f} ms")
         merged_result = dict(result)
         analysis_result = self._analysis_results_by_board.get(board_id)
         if analysis_result:
@@ -758,28 +777,55 @@ class ViewTab(QWidget):
 
     def handle_stitch_error(self, message):
         self.pending_stitch_jobs = max(0, self.pending_stitch_jobs - 1)
-        self.ai_time.setText("BLAD")
         self.add_log(f"Blad stitchingu: {message}")
 
     def handle_analysis_finished(self, result):
+        vector_ready_at = perf_counter()
         board_id = str(result.get("board_id", "")).strip()
         final_boxes = list(result.get("boxes", []))
         machine_cut_payload = self._build_machine_cut_payload(result)
         self._latest_machine_cut_payload = machine_cut_payload
+        preview_result = self._preview_results_by_board.get(board_id) if board_id else None
+        scan_duration_ms = float(
+            (
+                preview_result.get("scan_duration_ms")
+                if isinstance(preview_result, dict) and preview_result.get("scan_duration_ms") is not None
+                else result.get("scan_duration_ms", 0.0)
+            )
+            or 0.0
+        )
+        last_model_output_at = float(result.get("last_model_output_at", 0.0) or 0.0)
         machine_ready_latency_ms = float(result.get("machine_ready_latency_ms", 0.0) or 0.0)
+        if last_model_output_at > 0.0:
+            machine_ready_latency_ms = max(0.0, (vector_ready_at - last_model_output_at) * 1000.0)
+        edit_ms = float(result.get("edit_ms", 0.0) or 0.0)
+        first_image_at = float(result.get("first_image_at", 0.0) or 0.0)
+        total_pipeline_ms = float(result.get("total_pipeline_ms", 0.0) or 0.0)
+        if first_image_at > 0.0:
+            total_pipeline_ms = max(0.0, (vector_ready_at - first_image_at) * 1000.0)
+        self.scan_time.setText(f"{scan_duration_ms:.0f} ms")
+        self.ai_time.setText(f"{float(result.get('inference_ms', 0.0) or 0.0):.0f} ms")
         self.machine_ready_time.setText(f"{machine_ready_latency_ms:.0f} ms")
+        self.edit_time.setText(f"{edit_ms:.0f} ms")
+        self.total_time.setText(f"{total_pipeline_ms:.0f} ms")
         if machine_cut_payload is not None:
+            machine_cut_payload["scan_duration_ms"] = scan_duration_ms
+            machine_cut_payload["machine_ready_latency_ms"] = machine_ready_latency_ms
+            machine_cut_payload["total_pipeline_ms"] = total_pipeline_ms
             self.add_log(
                 "Plan ciecia dla maszyny gotowy: "
                 f"{machine_cut_payload['board_id']} "
                 f"ciecia={len(machine_cut_payload['cut_positions_mm'])} "
+                f"skan={scan_duration_ms:.0f} ms "
+                f"ai={float(result.get('inference_ms', 0.0) or 0.0):.0f} ms "
                 f"latencja={machine_ready_latency_ms:.0f} ms "
+                f"edycja={edit_ms:.0f} ms "
+                f"lacznie={total_pipeline_ms:.0f} ms "
                 f"strefy_zle={len(machine_cut_payload['bad_segments_mm'])} "
                 f"wektor={machine_cut_payload['machine_segments_payload']}"
             )
         if board_id:
             self._analysis_results_by_board[board_id] = dict(result)
-            preview_result = self._preview_results_by_board.get(board_id)
             if preview_result is not None:
                 merged_result = dict(preview_result)
                 projected_boxes = self._project_boxes_to_stitched_space(
@@ -809,7 +855,8 @@ class ViewTab(QWidget):
                     self._save_annotated_stitched_preview(Path(stitched_path), projected_boxes)
                 self._apply_cut_plan_payload()
         self._last_ai_ms = float(result.get("inference_ms", 0.0))
-        self.ai_time.setText(f"S:{self._last_stitch_ms:.0f} / M:{self._last_ai_ms:.0f} ms")
+        self._last_edit_ms = edit_ms
+        self._last_total_pipeline_ms = total_pipeline_ms
         self.defect_count.setText(str(len(final_boxes)))
         self.ai_status.set_status(
             "GOTOWE" if result.get("ai_available") else ("WYLACZONE" if not self.ai_enabled else "BRAK MODELU"),
@@ -833,6 +880,9 @@ class ViewTab(QWidget):
     def handle_analysis_error(self, message):
         self.ai_status.set_status("BLAD AI", False)
         self.ai_time.setText("BLAD")
+        self.machine_ready_time.setText("BLAD")
+        self.edit_time.setText("BLAD")
+        self.total_time.setText("BLAD")
         self.add_log(f"Blad AI stream: {message}")
 
     def restitch_latest_board(self):
@@ -854,7 +904,6 @@ class ViewTab(QWidget):
             return
 
         self.pending_stitch_jobs += 1
-        self.ai_time.setText("PRACA...")
         self.add_log(
             f"Re-stitch ostatniej deski: {latest_board_directory.name} "
             f"({len(source_image_paths)} zdjec)"
@@ -1042,7 +1091,17 @@ class ViewTab(QWidget):
             Qt.FastTransformation,
         )
         self.hover_zoom_label.setPixmap(zoom_pixmap)
-        self.hover_zoom_label.move(global_pos + QPoint(24, 24))
+        target_pos = global_pos + QPoint(24, 24)
+        screen = QApplication.screenAt(global_pos)
+        if screen is not None:
+            available_geometry = screen.availableGeometry()
+            if target_pos.x() + self.hover_zoom_label.width() > available_geometry.right():
+                target_pos.setX(global_pos.x() - self.hover_zoom_label.width() - 24)
+            if target_pos.y() + self.hover_zoom_label.height() > available_geometry.bottom():
+                target_pos.setY(max(available_geometry.top(), global_pos.y() - self.hover_zoom_label.height() - 24))
+            target_pos.setX(max(available_geometry.left(), target_pos.x()))
+            target_pos.setY(max(available_geometry.top(), target_pos.y()))
+        self.hover_zoom_label.move(target_pos)
         self.hover_zoom_label.show()
         self.hover_zoom_label.raise_()
 
@@ -1325,7 +1384,11 @@ class ViewTab(QWidget):
                 bad_segments_mm,
             ),
             "defect_count": len(boxes),
+            "scan_duration_ms": float(result.get("scan_duration_ms", 0.0) or 0.0),
             "inference_ms": float(result.get("inference_ms", 0.0) or 0.0),
+            "machine_ready_latency_ms": float(result.get("machine_ready_latency_ms", 0.0) or 0.0),
+            "edit_ms": float(result.get("edit_ms", 0.0) or 0.0),
+            "total_pipeline_ms": float(result.get("total_pipeline_ms", 0.0) or 0.0),
         }
 
     def _build_good_segments_mm(self, board_length_mm, bad_segments_mm):

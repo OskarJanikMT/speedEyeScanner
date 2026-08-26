@@ -62,31 +62,35 @@ class BoardAnalysisWorker(QObject):
             if not self._ai_enabled:
                 return
             self._ensure_board_session(event)
+            is_placeholder = bool(event.get("is_placeholder"))
             resolved_image_path = self._resolve_image_path_for_ai(event)
+            image_edit_started_at = perf_counter()
             source_image = rotate_qimage_180(
                 QImage(str(resolved_image_path)).convertToFormat(QImage.Format.Format_RGB32)
             )
             if source_image.isNull():
                 raise RuntimeError(f"Nie mozna wczytac obrazu do AI: {resolved_image_path}")
 
-            _, crop_window = crop_ai_ready_qimage(
-                source_image,
-                crop_x_margin_percent=self._settings.get_int("board_stitch_crop_x_margin_percent", 4),
-                active_threshold_percent=self._settings.get_int("board_stitch_active_threshold_percent", 28),
-                left_edge_anchor_px=self._settings.get_int("board_stitch_left_edge_anchor_px", 100),
-            )
-            if crop_window is not None:
-                crop_left_px, crop_right_px = crop_window
-                self._current_board["stream_crop_left_px"] = (
-                    crop_left_px
-                    if self._current_board["stream_crop_left_px"] is None
-                    else min(self._current_board["stream_crop_left_px"], crop_left_px)
+            if not is_placeholder:
+                _, crop_window = crop_ai_ready_qimage(
+                    source_image,
+                    crop_x_margin_percent=self._settings.get_int("board_stitch_crop_x_margin_percent", 4),
+                    active_threshold_percent=self._settings.get_int("board_stitch_active_threshold_percent", 28),
+                    left_edge_anchor_px=self._settings.get_int("board_stitch_left_edge_anchor_px", 100),
                 )
-                self._current_board["stream_crop_right_px"] = (
-                    crop_right_px
-                    if self._current_board["stream_crop_right_px"] is None
-                    else max(self._current_board["stream_crop_right_px"], crop_right_px)
-                )
+                if crop_window is not None:
+                    crop_left_px, crop_right_px = crop_window
+                    self._current_board["stream_crop_left_px"] = (
+                        crop_left_px
+                        if self._current_board["stream_crop_left_px"] is None
+                        else min(self._current_board["stream_crop_left_px"], crop_left_px)
+                    )
+                    self._current_board["stream_crop_right_px"] = (
+                        crop_right_px
+                        if self._current_board["stream_crop_right_px"] is None
+                        else max(self._current_board["stream_crop_right_px"], crop_right_px)
+                    )
+            self._current_board["edit_ms"] += (perf_counter() - image_edit_started_at) * 1000.0
 
             self._pending_segments.append(source_image)
             self._pending_height += source_image.height()
@@ -121,8 +125,13 @@ class BoardAnalysisWorker(QObject):
                         "image_count": int(event.get("image_count", 0) or 0),
                         "defect_count": 0,
                         "boxes": [],
+                        "scan_duration_ms": float(event.get("scan_duration_ms", 0.0) or 0.0),
                         "inference_ms": 0.0,
                         "machine_ready_latency_ms": 0.0,
+                        "edit_ms": 0.0,
+                        "total_pipeline_ms": float(event.get("scan_duration_ms", 0.0) or 0.0),
+                        "first_image_at": float(event.get("scan_started_at", 0.0) or 0.0),
+                        "last_model_output_at": 0.0,
                         "image_height_px": 0,
                         "ai_available": False,
                         "ai_error": "",
@@ -136,14 +145,20 @@ class BoardAnalysisWorker(QObject):
             self._drain_ready_tiles(flush=True)
             ready_started_at = perf_counter()
             self._current_board["boxes"] = self._aggregate_stream_boxes(self._current_board["boxes"])
+            vector_ready_at = perf_counter()
             result = {
                 "board_id": self._current_board["board_id"],
                 "length_mm": self._current_board["length_mm"],
                 "image_count": self._current_board["image_count"],
                 "defect_count": len(self._current_board["boxes"]),
                 "boxes": self._current_board["boxes"],
+                "scan_duration_ms": float(self._current_board.get("scan_duration_ms", 0.0) or 0.0),
                 "inference_ms": self._current_board["inference_ms"],
                 "machine_ready_latency_ms": 0.0,
+                "edit_ms": float(self._current_board.get("edit_ms", 0.0) or 0.0),
+                "total_pipeline_ms": 0.0,
+                "first_image_at": float(self._current_board.get("first_image_at", 0.0) or 0.0),
+                "last_model_output_at": float(self._current_board.get("last_model_output_at", 0.0) or 0.0),
                 "image_height_px": self._current_board["image_height_px"],
                 "image_width_px": self._current_board["image_width_px"],
                 "stream_crop_left_px": self._current_board["stream_crop_left_px"],
@@ -152,11 +167,20 @@ class BoardAnalysisWorker(QObject):
                 "ai_error": "",
                 "detections_path": "",
             }
-            last_model_output_at = float(self._current_board.get("last_model_output_at", 0.0) or 0.0)
+            last_model_output_at = float(result.get("last_model_output_at", 0.0) or 0.0)
             if last_model_output_at > 0.0:
                 result["machine_ready_latency_ms"] = max(
                     0.0,
-                    (ready_started_at - last_model_output_at) * 1000.0,
+                    (vector_ready_at - last_model_output_at) * 1000.0,
+                )
+            first_image_at = float(result.get("first_image_at", 0.0) or 0.0)
+            if first_image_at > 0.0:
+                result["total_pipeline_ms"] = max(0.0, (vector_ready_at - first_image_at) * 1000.0)
+            else:
+                result["total_pipeline_ms"] = (
+                    float(result.get("scan_duration_ms", 0.0) or 0.0)
+                    + float(result.get("inference_ms", 0.0) or 0.0)
+                    + float(result.get("machine_ready_latency_ms", 0.0) or 0.0)
                 )
             self.finished.emit(result)
             self._reset_board_session()
@@ -181,8 +205,11 @@ class BoardAnalysisWorker(QObject):
                 "image_width_px": 0,
                 "tile_index": 0,
                 "boxes": [],
+                "scan_duration_ms": float(event.get("scan_duration_ms", 0.0) or 0.0),
+                "first_image_at": float(event.get("scan_started_at", 0.0) or 0.0),
                 "inference_ms": 0.0,
                 "last_model_output_at": 0.0,
+                "edit_ms": 0.0,
                 "stream_crop_left_px": None,
                 "stream_crop_right_px": None,
             }
@@ -196,6 +223,7 @@ class BoardAnalysisWorker(QObject):
                 break
 
     def _consume_tile_image(self, tile_height):
+        edit_started_at = perf_counter()
         slices = []
         remaining_height = tile_height
         max_width = 1
@@ -223,6 +251,8 @@ class BoardAnalysisWorker(QObject):
         painter.end()
 
         self._pending_height = max(0, self._pending_height - tile_height)
+        if self._current_board is not None:
+            self._current_board["edit_ms"] += (perf_counter() - edit_started_at) * 1000.0
         return tile
 
     def _run_tile_detection(self, tile_image):
@@ -236,9 +266,11 @@ class BoardAnalysisWorker(QObject):
         crop_right_px = int(self._current_board.get("stream_crop_right_px") or tile_image.width())
         crop_left_px = max(0, min(tile_image.width() - 1, crop_left_px))
         crop_right_px = max(crop_left_px + 1, min(tile_image.width(), crop_right_px))
+        edit_started_at = perf_counter()
         cropped_tile_image = tile_image.copy(crop_left_px, 0, crop_right_px - crop_left_px, tile_image.height())
         if cropped_tile_image.isNull():
             raise RuntimeError("Nie udalo sie przyciac gotowego tile AI")
+        self._current_board["edit_ms"] += (perf_counter() - edit_started_at) * 1000.0
 
         tile_index = self._current_board["tile_index"]
         response = self._send_ai_request(

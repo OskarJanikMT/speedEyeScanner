@@ -1,8 +1,16 @@
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtGui import QColor, QImage
+
+from helpers.app_settings import AppSettings
+
+
+DEFAULT_PLACEHOLDER_WIDTH_PX = 2000
+DEFAULT_PLACEHOLDER_HEIGHT_PX = 976
 
 
 class BoardBatchWorker(QObject):
@@ -15,9 +23,12 @@ class BoardBatchWorker(QObject):
 
     def __init__(self):
         super().__init__()
+        self._settings = AppSettings()
         self._scanner_active = False
         self._pending_image_paths = deque()
         self._pending_board_batches = deque()
+        self._last_image_width = DEFAULT_PLACEHOLDER_WIDTH_PX
+        self._last_image_height = DEFAULT_PLACEHOLDER_HEIGHT_PX
 
     @Slot(bool)
     def set_scanner_active(self, active):
@@ -35,6 +46,9 @@ class BoardBatchWorker(QObject):
     def handle_board_context(self, board_context):
         if not self._scanner_active:
             return
+
+        self._process_pending_board_batches()
+        self._finalize_incomplete_batches_with_placeholders()
 
         current_board_context = dict(board_context or {})
         board_id = current_board_context.get("board_id", "").strip()
@@ -62,6 +76,8 @@ class BoardBatchWorker(QObject):
                     "assigned_count": 0,
                     "source_files": [],
                     "received_at": datetime.now().isoformat(timespec="microseconds"),
+                    "first_image_at": 0.0,
+                    "last_image_at": 0.0,
                 }
             )
             summary = self._build_pending_batches_summary()
@@ -76,6 +92,8 @@ class BoardBatchWorker(QObject):
             return
 
         image_path = Path(file_path)
+        self._last_image_width = max(1, int((metadata or {}).get("width") or self._last_image_width))
+        self._last_image_height = max(1, int((metadata or {}).get("height") or self._last_image_height))
         self._pending_image_paths.append(image_path)
         summary = self._build_pending_batches_summary()
         self.image_event.emit(
@@ -83,6 +101,7 @@ class BoardBatchWorker(QObject):
                 "file_path": str(image_path),
                 "metadata": dict(metadata or {}),
                 "summary": summary,
+                "is_placeholder": False,
             }
         )
         self._process_pending_board_batches()
@@ -93,6 +112,10 @@ class BoardBatchWorker(QObject):
             expected_count = batch["photo_count"]
             while batch["assigned_count"] < expected_count and self._pending_image_paths:
                 image_path = self._pending_image_paths.popleft()
+                assigned_at = perf_counter()
+                if batch["first_image_at"] <= 0.0:
+                    batch["first_image_at"] = assigned_at
+                batch["last_image_at"] = assigned_at
                 batch["source_files"].append(image_path)
                 batch["assigned_count"] += 1
                 self.board_image_ready.emit(
@@ -104,6 +127,9 @@ class BoardBatchWorker(QObject):
                         "image_count": expected_count,
                         "is_last_image": batch["assigned_count"] == expected_count,
                         "summary": self._build_pending_batches_summary(),
+                        "is_placeholder": False,
+                        "scan_started_at": batch["first_image_at"],
+                        "scan_last_image_at": batch["last_image_at"],
                     }
                 )
 
@@ -125,8 +151,99 @@ class BoardBatchWorker(QObject):
                     "image_count": len(batch["source_files"]),
                     "source_paths": [str(path) for path in batch["source_files"]],
                     "summary": self._build_pending_batches_summary(),
+                    "has_placeholder_images": False,
+                    "scan_started_at": batch["first_image_at"],
+                    "scan_last_image_at": batch["last_image_at"],
+                    "scan_duration_ms": self._calculate_scan_duration_ms(batch),
                 }
             )
+
+    def _finalize_incomplete_batches_with_placeholders(self):
+        while self._pending_board_batches and self._pending_board_batches[0]["assigned_count"] < self._pending_board_batches[0]["photo_count"]:
+            batch = self._pending_board_batches[0]
+            missing_count = max(0, batch["photo_count"] - batch["assigned_count"])
+            if missing_count <= 0:
+                break
+
+            self.log.emit(
+                f"Brakujace zdjecia dla {batch['board_id']}: uzupelniam {missing_count} czarnymi placeholderami"
+            )
+            for _ in range(missing_count):
+                placeholder_path = self._create_black_placeholder_image(
+                    board_id=batch["board_id"],
+                    image_index=batch["assigned_count"] + 1,
+                )
+                assigned_at = perf_counter()
+                if batch["first_image_at"] <= 0.0:
+                    batch["first_image_at"] = assigned_at
+                batch["last_image_at"] = assigned_at
+                batch["source_files"].append(placeholder_path)
+                batch["assigned_count"] += 1
+                self.board_image_ready.emit(
+                    {
+                        "board_id": batch["board_id"],
+                        "length_mm": batch["length_mm"],
+                        "file_path": str(placeholder_path),
+                        "image_index": batch["assigned_count"],
+                        "image_count": batch["photo_count"],
+                        "is_last_image": batch["assigned_count"] == batch["photo_count"],
+                        "summary": self._build_pending_batches_summary(),
+                        "is_placeholder": True,
+                        "scan_started_at": batch["first_image_at"],
+                        "scan_last_image_at": batch["last_image_at"],
+                    }
+                )
+
+            self._pending_board_batches.popleft()
+            self.stitch_job_ready.emit(
+                {
+                    "board_id": batch["board_id"],
+                    "length_mm": batch["length_mm"],
+                    "image_count": len(batch["source_files"]),
+                    "source_paths": [str(path) for path in batch["source_files"]],
+                    "summary": self._build_pending_batches_summary(),
+                    "has_placeholder_images": True,
+                    "scan_started_at": batch["first_image_at"],
+                    "scan_last_image_at": batch["last_image_at"],
+                    "scan_duration_ms": self._calculate_scan_duration_ms(batch),
+                }
+            )
+
+    def _create_black_placeholder_image(self, board_id, image_index):
+        placeholder_root = self._get_camera_output_directory() / "_placeholders"
+        placeholder_root.mkdir(parents=True, exist_ok=True)
+        placeholder_path = placeholder_root / f"{self._sanitize_path_component(board_id)}_missing_{int(image_index):03d}.bmp"
+
+        image = QImage(
+            max(1, int(self._last_image_width or DEFAULT_PLACEHOLDER_WIDTH_PX)),
+            max(1, int(self._last_image_height or DEFAULT_PLACEHOLDER_HEIGHT_PX)),
+            QImage.Format.Format_RGB32,
+        )
+        image.fill(QColor(0, 0, 0))
+        if not image.save(str(placeholder_path), "BMP"):
+            raise RuntimeError(f"Nie udalo sie zapisac placeholdera: {placeholder_path}")
+        return placeholder_path
+
+    def _get_camera_output_directory(self):
+        output_directory = self._settings.get("camera_output_directory", "").strip()
+        if not output_directory:
+            output_directory = self._settings.get("save_directory", "").strip()
+        if not output_directory:
+            output_directory = str(Path.cwd() / "scany")
+        return Path(output_directory)
+
+    def _sanitize_path_component(self, value):
+        sanitized = str(value).strip()
+        sanitized = "".join("_" if char in '<>:\"/\\|?*' else char for char in sanitized)
+        sanitized = sanitized.rstrip(". ")
+        return sanitized[:120] or "unknown_board"
+
+    def _calculate_scan_duration_ms(self, batch):
+        first_image_at = float(batch.get("first_image_at", 0.0) or 0.0)
+        last_image_at = float(batch.get("last_image_at", 0.0) or 0.0)
+        if first_image_at <= 0.0 or last_image_at <= 0.0:
+            return 0.0
+        return max(0.0, (last_image_at - first_image_at) * 1000.0)
 
     def _normalize_photo_count(self, value):
         try:

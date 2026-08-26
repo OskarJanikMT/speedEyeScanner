@@ -5,6 +5,8 @@ set "PROJECT_DIR=%~dp0"
 set "VENV_DIR=%PROJECT_DIR%.venv313"
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "REQUIREMENTS_FILE=%PROJECT_DIR%requirements.txt"
+set "PYTHON_VERSION=3.13"
+set "PYTHON_WINGET_ID=Python.Python.3.13"
 
 if not exist "%REQUIREMENTS_FILE%" (
     echo [BLAD] Nie znaleziono pliku requirements.txt:
@@ -15,15 +17,55 @@ if not exist "%REQUIREMENTS_FILE%" (
 
 where py >nul 2>nul
 if errorlevel 1 (
-    echo [BLAD] Nie znaleziono launchera Python 'py'.
-    echo Zainstaluj Python 3.13 i sproboj ponownie.
+    goto install_python
+)
+
+py -%PYTHON_VERSION% --version >nul 2>nul
+if errorlevel 1 (
+    goto install_python
+)
+
+goto create_venv
+
+:install_python
+echo Nie znaleziono Python %PYTHON_VERSION%.
+echo Proba instalacji przez winget...
+where winget >nul 2>nul
+if errorlevel 1 (
+    echo [BLAD] Nie znaleziono winget.
+    echo Zainstaluj recznie Python %PYTHON_VERSION% i uruchom ten plik ponownie.
     pause
     exit /b 1
 )
 
+winget install --id %PYTHON_WINGET_ID% -e --accept-package-agreements --accept-source-agreements
+if errorlevel 1 (
+    echo [BLAD] Instalacja Python %PYTHON_VERSION% przez winget nie powiodla sie.
+    echo Zainstaluj recznie Python %PYTHON_VERSION% i uruchom ten plik ponownie.
+    pause
+    exit /b 1
+)
+
+where py >nul 2>nul
+if errorlevel 1 (
+    echo [BLAD] Python zostal zainstalowany, ale launcher 'py' nadal nie jest widoczny.
+    echo Zamknij to okno i uruchom instalator ponownie.
+    pause
+    exit /b 1
+)
+
+py -%PYTHON_VERSION% --version >nul 2>nul
+if errorlevel 1 (
+    echo [BLAD] Python %PYTHON_VERSION% nadal nie jest widoczny dla launchera 'py'.
+    echo Zamknij to okno i uruchom instalator ponownie.
+    pause
+    exit /b 1
+)
+
+:create_venv
 if not exist "%VENV_PYTHON%" (
     echo Tworzenie srodowiska virtualnego .venv313...
-    py -3.13 -m venv "%VENV_DIR%"
+    py -%PYTHON_VERSION% -m venv "%VENV_DIR%"
     if errorlevel 1 (
         echo [BLAD] Nie udalo sie utworzyc srodowiska .venv313.
         pause

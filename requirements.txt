@@ -1,4 +1,10 @@
 .\Baumer_neoAPI_1.6.0_win_x86_64_python\wheel\baumer_neoapi-1.6.0-cp36.cp37.cp38.cp39.cp310.cp311.cp312.cp313-none-win_amd64.whl
+# Oficjalne buildy CUDA dla RTX 5070 Ti. Sterownik NVIDIA 13.x jest zgodny
+# wstecz z runtime CUDA 12.8 dołączonym do PyTorch.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+torchaudio==2.11.0+cu128
 anyio==4.14.2
 certifi==2026.7.22
 charset-normalizer==3.5.1
@@ -27,7 +33,9 @@ nvidia-cuda-runtime==13.3.29
 nvidia-cudnn-cu13==9.24.0.43
 nvidia-ml-py==13.610.43
 onnx==1.22.0
-onnxruntime-gpu==1.26.0
+# Wersja CPU nie wymaga systemowych bibliotek CUDA. Aplikacja może działać na
+# każdej stacji roboczej, a helper sam użyje CPU do inferencji ONNX.
+onnxruntime==1.26.0
 onnxslim==0.1.96
 opencv-python==5.0.0.93
 packaging==26.3

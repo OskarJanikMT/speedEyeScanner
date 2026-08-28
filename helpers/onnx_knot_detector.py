@@ -9,8 +9,17 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 from ultralytics import YOLO
+
+try:
+    import onnxruntime as ort
+except ImportError as exc:
+    # ONNX Runtime is only needed for .onnx models.  Keeping it optional lets
+    # a PyTorch model run even on workstations without the native ORT DLLs.
+    ort = None
+    ONNX_RUNTIME_IMPORT_ERROR = str(exc)
+else:
+    ONNX_RUNTIME_IMPORT_ERROR = ""
 
 
 DEFAULT_MODEL_IMAGE_HEIGHT = 768
@@ -35,7 +44,7 @@ cv2.ocl.setUseOpenCL(False)
 
 
 def preload_nvidia_dll_directories():
-    if not hasattr(os, "add_dll_directory"):
+    if ort is None or not hasattr(os, "add_dll_directory"):
         return
 
     site_packages_dir = Path(ort.__file__).resolve().parent.parent
@@ -49,8 +58,9 @@ def preload_nvidia_dll_directories():
             os.add_dll_directory(str(directory))
 
 
-preload_nvidia_dll_directories()
-ort.preload_dlls(directory="")
+if ort is not None:
+    preload_nvidia_dll_directories()
+    ort.preload_dlls(directory="")
 
 
 def is_onnx_model(model_path):
@@ -58,6 +68,8 @@ def is_onnx_model(model_path):
 
 
 def get_available_onnx_execution_providers():
+    if ort is None:
+        return []
     try:
         return list(ort.get_available_providers())
     except Exception:
@@ -65,6 +77,11 @@ def get_available_onnx_execution_providers():
 
 
 def resolve_onnx_execution_provider(model_path):
+    if ort is None:
+        raise RuntimeError(
+            "Nie mozna uruchomic modelu ONNX: onnxruntime nie zostal zaladowany. "
+            f"Szczegoly: {ONNX_RUNTIME_IMPORT_ERROR}"
+        )
     available_providers = get_available_onnx_execution_providers()
     if "CUDAExecutionProvider" in available_providers:
         try:

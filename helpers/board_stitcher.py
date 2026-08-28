@@ -1,4 +1,8 @@
 from pathlib import Path
+from time import perf_counter
+
+import numpy as np
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QTransform
 
@@ -92,7 +96,12 @@ def stitch_board_folder(
     if not image_paths:
         return None
 
-    images = [rotate_qimage_180(QImage(str(path)).convertToFormat(QImage.Format.Format_RGB32)) for path in image_paths]
+    load_started_at = perf_counter()
+    images = [
+        rotate_qimage_180(QImage(str(path)).convertToFormat(QImage.Format.Format_RGB32))
+        for path in image_paths
+    ]
+    load_rotate_ms = (perf_counter() - load_started_at) * 1000.0
     if any(image.isNull() for image in images):
         return None
 
@@ -104,6 +113,7 @@ def stitch_board_folder(
 
     canvas_width = max(image.width() for image in images)
     canvas_height = max(offset + image.height() for offset, image in zip(offsets, images))
+    compose_started_at = perf_counter()
     canvas = QImage(canvas_width, canvas_height, QImage.Format.Format_RGB32)
     canvas.fill(QColor(0, 0, 0))
 
@@ -112,7 +122,9 @@ def stitch_board_folder(
     for y_offset, image in zip(offsets, images):
         painter.drawImage(0, y_offset, image)
     painter.end()
+    compose_ms = (perf_counter() - compose_started_at) * 1000.0
 
+    crop_started_at = perf_counter()
     final_crop_rect = _estimate_final_board_crop_rect(
         canvas,
         crop_x_margin_percent=crop_x_margin_percent,
@@ -127,12 +139,15 @@ def stitch_board_folder(
     if final_crop_rect is not None:
         canvas = canvas.copy(*final_crop_rect)
     canvas = rotate_qimage_180(canvas)
+    crop_rotate_ms = (perf_counter() - crop_started_at) * 1000.0
 
     output_path = folder / "stitched.bmp"
     temp_output_path = folder / "stitched.tmp.bmp"
+    save_started_at = perf_counter()
     if not canvas.save(str(temp_output_path), "BMP"):
         return None
     temp_output_path.replace(output_path)
+    save_ms = (perf_counter() - save_started_at) * 1000.0
 
     if on_log is not None:
         mode_text = "ai-ready crop + finalny crop" if stitch_mode == "ai_ready" else "pelne doklejanie + finalny crop"
@@ -142,6 +157,12 @@ def stitch_board_folder(
         on_log(
             f"Scalono {len(image_paths)} zdjec do {output_path.name} "
             f"(tryb: {mode_text}, xmax={int(max_horizontal_shift_px)}px{crop_suffix})"
+        )
+        on_log(
+            "Czas stitchingu [ms]: "
+            f"wczytanie+obrot={load_rotate_ms:.0f}, "
+            f"skladanie={compose_ms:.0f}, "
+            f"crop+obrot={crop_rotate_ms:.0f}, zapis={save_ms:.0f}"
         )
 
     if not return_metadata:
@@ -192,19 +213,10 @@ def _crop_images_for_ai_ready_stitch(
 
 def _compute_column_means(image):
     x_step = 8
-    width = image.width()
-    height = image.height()
-    bytes_per_line = image.bytesPerLine()
-    data = bytes(image.bits())
-
-    column_means = []
-    for x in range(0, width, x_step):
-        total = 0
-        for y in range(height):
-            index = y * bytes_per_line + x * 4
-            total += _gray_at(data, index)
-        column_means.append(total / height)
-    return column_means
+    pixels = _qimage_pixels(image)
+    samples = pixels[:, ::x_step, :3].astype(np.float32)
+    gray = samples[:, :, 2] * 0.299 + samples[:, :, 1] * 0.587 + samples[:, :, 0] * 0.114
+    return gray.mean(axis=0).tolist()
 
 
 def _gray_at(data, index):
@@ -217,9 +229,6 @@ def _gray_at(data, index):
 def _compute_row_means(image, left_edge, right_edge):
     x_step = 8
     width = image.width()
-    height = image.height()
-    bytes_per_line = image.bytesPerLine()
-    data = bytes(image.bits())
 
     left = max(0, min(width - 1, left_edge))
     right = max(left + 1, min(width, right_edge))
@@ -227,14 +236,19 @@ def _compute_row_means(image, left_edge, right_edge):
     if not sample_positions:
         sample_positions = list(range(0, width, x_step))
 
-    row_means = []
-    for y in range(height):
-        total = 0
-        for x in sample_positions:
-            index = y * bytes_per_line + x * 4
-            total += _gray_at(data, index)
-        row_means.append(total / len(sample_positions))
-    return row_means
+    pixels = _qimage_pixels(image)
+    samples = pixels[:, sample_positions, :3].astype(np.float32)
+    gray = samples[:, :, 2] * 0.299 + samples[:, :, 1] * 0.587 + samples[:, :, 0] * 0.114
+    return gray.mean(axis=1).tolist()
+
+
+def _qimage_pixels(image):
+    """Returns a BGR view of an RGB32 QImage without copying every pixel to Python."""
+    width = image.width()
+    height = image.height()
+    raw = np.frombuffer(image.constBits(), dtype=np.uint8, count=image.sizeInBytes())
+    rows = raw.reshape(height, image.bytesPerLine())
+    return rows[:, : width * 4].reshape(height, width, 4)
 
 
 def _compute_row_means_center(image, left_edge, right_edge, keep_ratio=0.6):

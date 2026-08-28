@@ -14,7 +14,7 @@ from helpers.board_stitcher import stitch_board_folder
 
 AI_PYTHON = Path(__file__).resolve().parent.parent / ".venv313" / "Scripts" / "python.exe"
 AI_CONFIG_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_AI_MODEL = Path(r"D:\SpeedEyeWoodTraining\runs\merged_tiled_continue_20260824\weights\best.onnx")
+DEFAULT_AI_MODEL = Path(__file__).resolve().parent.parent / "model" / "weights" / "best.pt"
 AI_HELPER = Path(__file__).resolve().parent.parent / "helpers" / "onnx_knot_detector.py"
 LEGACY_AI_MODEL_MARKERS = (
     r"D:\SpeedEyeWoodTraining\runs\datasetV1_tiled_v1\weights\best.pt",
@@ -48,6 +48,7 @@ class StitchWorker(QObject):
     @Slot(object)
     def process_request(self, request):
         try:
+            pipeline_started_at = perf_counter()
             folder_path = request["folder_path"]
             self._prepare_board_folder(request)
             scan_duration_ms = self._calculate_scan_duration_ms(
@@ -99,6 +100,7 @@ class StitchWorker(QObject):
                         "ai_error": "",
                     }
                 )
+            payload["total_pipeline_ms"] = (perf_counter() - pipeline_started_at) * 1000.0
             self.finished.emit(payload)
         except Exception as exc:
             self.error.emit(str(exc))
@@ -319,7 +321,7 @@ class StitchWorker(QObject):
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             bufsize=1,
@@ -333,6 +335,8 @@ class StitchWorker(QObject):
         last_nonempty_line = ""
         while perf_counter() < deadline:
             remaining_seconds = max(0.1, deadline - perf_counter())
+            if not self._is_ai_process_running():
+                raise RuntimeError(self._get_ai_process_error())
             line = self._read_ai_stdout_line(timeout_seconds=remaining_seconds)
             if not line:
                 continue
@@ -342,6 +346,15 @@ class StitchWorker(QObject):
         raise RuntimeError(
             f"Helper AI nie zglosil gotowosci: {last_nonempty_line or 'brak odpowiedzi'}"
         )
+
+    def _get_ai_process_error(self):
+        if self._ai_process is None or self._ai_process.stderr is None:
+            return "Proces helpera AI zakonczyl sie podczas uruchamiania"
+        try:
+            details = self._ai_process.stderr.read().strip()
+        except Exception:
+            details = ""
+        return details or "Proces helpera AI zakonczyl sie podczas uruchamiania"
 
     def _read_ai_stdout_line(self, timeout_seconds):
         if not self._is_ai_process_running() or self._ai_process.stdout is None:

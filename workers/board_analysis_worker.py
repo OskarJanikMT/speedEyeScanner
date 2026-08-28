@@ -16,7 +16,7 @@ from helpers.board_stitcher import crop_ai_ready_qimage, rotate_qimage_180
 
 AI_PYTHON = Path(__file__).resolve().parent.parent / ".venv313" / "Scripts" / "python.exe"
 AI_CONFIG_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_AI_MODEL = Path(r"D:\SpeedEyeWoodTraining\runs\merged_tiled_continue_20260824\weights\best.onnx")
+DEFAULT_AI_MODEL = Path(__file__).resolve().parent.parent / "model" / "weights" / "best.pt"
 AI_HELPER = Path(__file__).resolve().parent.parent / "helpers" / "onnx_knot_detector.py"
 LEGACY_AI_MODEL_MARKERS = (
     r"D:\SpeedEyeWoodTraining\runs\datasetV1_tiled_v1\weights\best.pt",
@@ -498,7 +498,7 @@ class BoardAnalysisWorker(QObject):
             self._build_ai_serve_command(model_path),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             bufsize=1,
@@ -511,6 +511,8 @@ class BoardAnalysisWorker(QObject):
         deadline = perf_counter() + timeout_seconds
         last_nonempty_line = ""
         while perf_counter() < deadline:
+            if not self._is_ai_process_running():
+                raise RuntimeError(self._get_ai_process_error())
             line = self._read_ai_stdout_line(max(0.1, deadline - perf_counter()))
             if not line:
                 continue
@@ -518,6 +520,15 @@ class BoardAnalysisWorker(QObject):
                 return
             last_nonempty_line = line
         raise RuntimeError(f"Helper AI nie zglosil gotowosci: {last_nonempty_line or 'brak odpowiedzi'}")
+
+    def _get_ai_process_error(self):
+        if self._ai_process is None or self._ai_process.stderr is None:
+            return "Proces helpera AI zakonczyl sie podczas uruchamiania"
+        try:
+            details = self._ai_process.stderr.read().strip()
+        except Exception:
+            details = ""
+        return details or "Proces helpera AI zakonczyl sie podczas uruchamiania"
 
     def _read_ai_stdout_line(self, timeout_seconds):
         if not self._is_ai_process_running() or self._ai_process.stdout is None:

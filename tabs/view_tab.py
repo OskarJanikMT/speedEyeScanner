@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import re
 from time import perf_counter
 
 from PySide6.QtCore import QEvent, QPoint, QThread, Qt, Signal, QTimer
@@ -685,7 +686,7 @@ class ViewTab(QWidget):
                 "cut_bad_zone_offset_mm": self.settings_store.get_int(
                     "cut_bad_zone_offset_mm", 120
                 ),
-                "ai_enabled": False,
+                "ai_enabled": self.ai_enabled,
             }
         )
         self.status_message_callback(
@@ -724,6 +725,7 @@ class ViewTab(QWidget):
         self.analysis_worker = None
 
     def handle_stitch_finished(self, result):
+        vector_started_at = perf_counter()
         self.pending_stitch_jobs = max(0, self.pending_stitch_jobs - 1)
         board_id = str(result.get("board_id", "")).strip()
         if board_id:
@@ -732,8 +734,7 @@ class ViewTab(QWidget):
         stitch_ms = result.get("elapsed_ms", 0.0)
         self._last_stitch_ms = stitch_ms
         scan_duration_ms = float(result.get("scan_duration_ms", 0.0) or 0.0)
-        if scan_duration_ms > 0.0:
-            self.scan_time.setText(f"{scan_duration_ms:.0f} ms")
+        self.scan_time.setText(f"{scan_duration_ms:.0f} ms")
         merged_result = dict(result)
         analysis_result = self._analysis_results_by_board.get(board_id)
         if analysis_result:
@@ -761,6 +762,22 @@ class ViewTab(QWidget):
                 }
             )
         self._last_cut_plan_payload = self._build_cut_plan_payload(merged_result)
+        self._log_machine_vector(merged_result)
+        machine_ready_ms = (perf_counter() - vector_started_at) * 1000.0
+        ai_ms = float(result.get("inference_ms", 0.0) or 0.0)
+        total_pipeline_ms = float(result.get("total_pipeline_ms", 0.0) or 0.0)
+        self._last_ai_ms = ai_ms
+        self._last_edit_ms = stitch_ms
+        self._last_total_pipeline_ms = total_pipeline_ms
+        self.ai_time.setText(f"{ai_ms:.0f} ms")
+        self.machine_ready_time.setText(f"{machine_ready_ms:.0f} ms")
+        self.edit_time.setText(f"{stitch_ms:.0f} ms")
+        self.total_time.setText(f"{total_pipeline_ms:.0f} ms")
+        self.defect_count.setText(str(len(merged_result.get("boxes", []))))
+        self.ai_status.set_status(
+            "GOTOWE" if result.get("ai_available") else "BRAK MODELU",
+            bool(result.get("ai_available")),
+        )
         preview_path = stitched_path
         if preview_path is not None:
             preview_path = Path(preview_path)
@@ -903,7 +920,14 @@ class ViewTab(QWidget):
             self.status_message_callback("Brak zdjec do stitchingu")
             return
 
+        previous_result = self._preview_results_by_board.get(latest_board_directory.name, {})
+        length_mm = previous_result.get("length_mm") or self.current_board_context.get("length_mm")
         self.pending_stitch_jobs += 1
+        self.scan_time.setText("PRACA...")
+        self.ai_time.setText("PRACA...")
+        self.machine_ready_time.setText("PRACA...")
+        self.edit_time.setText("PRACA...")
+        self.total_time.setText("PRACA...")
         self.add_log(
             f"Re-stitch ostatniej deski: {latest_board_directory.name} "
             f"({len(source_image_paths)} zdjec)"
@@ -912,7 +936,7 @@ class ViewTab(QWidget):
             {
                 "board_id": latest_board_directory.name,
                 "image_count": len(source_image_paths),
-                "length_mm": self.current_board_context.get("length_mm"),
+                "length_mm": length_mm,
                 "folder_path": str(latest_board_directory),
                 "max_horizontal_shift_px": self.settings_store.get_int(
                     "board_stitch_max_horizontal_shift_px", 36
@@ -939,7 +963,7 @@ class ViewTab(QWidget):
                 "cut_bad_zone_offset_mm": self.settings_store.get_int(
                     "cut_bad_zone_offset_mm", 120
                 ),
-                "ai_enabled": False,
+                "ai_enabled": self.ai_enabled,
             }
         )
         self.status_message_callback(f"Przestitchowanie: {latest_board_directory.name}")
@@ -981,7 +1005,7 @@ class ViewTab(QWidget):
             pen.setWidth(11)
             painter.setPen(pen)
             confidence_font = QFont(painter.font())
-            confidence_font.setPointSizeF(max(8.0, confidence_font.pointSizeF() * 3.0))
+            confidence_font.setPointSizeF(max(8.0, confidence_font.pointSizeF() * 7.5))
             painter.setFont(confidence_font)
             for box in boxes:
                 x1 = int(box.get("x1", 0))
@@ -1110,8 +1134,8 @@ class ViewTab(QWidget):
             self.hover_zoom_label.hide()
 
     def _build_cut_plan_payload(self, result):
-        length_mm = result.get("length_mm")
         stitched_path = result.get("stitched_path")
+        length_mm = self._resolve_cut_plan_length_mm(result.get("length_mm"), stitched_path)
         boxes = result.get("boxes", [])
         image_height_px = int(result.get("image_height_px", 0) or 0)
         bad_zone_offset_mm = result.get(
@@ -1138,6 +1162,27 @@ class ViewTab(QWidget):
             "board_length_mm": float(length_mm),
             "bad_segments_mm": bad_segments_mm,
         }
+
+    def _resolve_cut_plan_length_mm(self, length_mm, stitched_path):
+        try:
+            resolved_length = float(length_mm)
+        except (TypeError, ValueError):
+            resolved_length = 0.0
+        if resolved_length > 0.0:
+            return resolved_length
+
+        # Ręczny re-stitch nie ma aktywnego kontekstu PLC po restarcie aplikacji.
+        # Foldery skanów zapisujemy jednak jako np. L2495_P25_..., więc możemy
+        # odzyskać z nich niezbędną długość do przeliczenia planu cięcia.
+        if stitched_path is not None:
+            folder_name = Path(stitched_path).parent.name
+            match = re.search(r"(?:^|_)L(\d+(?:[.,]\d+)?)(?:_|$)", folder_name, re.IGNORECASE)
+            if match:
+                try:
+                    return float(match.group(1).replace(",", "."))
+                except ValueError:
+                    pass
+        return 0.0
 
     def _extract_cut_positions_mm(self, cut_plan_payload):
         if not cut_plan_payload:
@@ -1354,8 +1399,12 @@ class ViewTab(QWidget):
 
     def _build_machine_cut_payload(self, result):
         board_id = str(result.get("board_id", "")).strip()
-        board_length_mm = float(result.get("length_mm", 0) or 0)
+        board_length_mm = self._resolve_cut_plan_length_mm(
+            result.get("length_mm"), result.get("stitched_path")
+        )
         image_height_px = int(result.get("image_height_px", 0) or 0)
+        if image_height_px <= 0:
+            image_height_px = self._read_image_height(result.get("stitched_path"))
         boxes = list(result.get("boxes", []) or [])
         if not board_id or board_length_mm <= 0 or image_height_px <= 0:
             return None
@@ -1391,6 +1440,18 @@ class ViewTab(QWidget):
             "total_pipeline_ms": float(result.get("total_pipeline_ms", 0.0) or 0.0),
         }
 
+    def _log_machine_vector(self, result):
+        machine_cut_payload = self._build_machine_cut_payload(result)
+        if machine_cut_payload is None:
+            self.add_log("Wektor dla nastepnej maszyny: brak danych do wyliczenia")
+            return
+        self._latest_machine_cut_payload = machine_cut_payload
+        self.add_log(
+            "Wektor dla nastepnej maszyny: "
+            f"deska={machine_cut_payload['board_id']} "
+            f"dane={machine_cut_payload['machine_segments_payload']}"
+        )
+
     def _build_good_segments_mm(self, board_length_mm, bad_segments_mm):
         if board_length_mm <= 0:
             return []
@@ -1425,7 +1486,9 @@ class ViewTab(QWidget):
             if length_mm > 0:
                 segments.append((float(start_mm), 3, length_mm))
 
-        segments.sort(key=lambda item: item[0])
+        # Kolejna maszyna odbiera deskę od jej końca, dlatego pary typu i
+        # długości przekazujemy w kolejności malejących pozycji.
+        segments.sort(key=lambda item: item[0], reverse=True)
 
         payload = [total_length_mm]
         for _, segment_class, length_mm in segments:
